@@ -1,0 +1,2158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI System Architecture Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569; 
+        }
+        @keyframes perfPulse {
+            0%, 100% { opacity: 0.35; }
+            50% { opacity: 1; }
+        }
+        @keyframes perfTravelFull {
+            0% { left: 0%; opacity: 0; }
+            5% { opacity: 1; left: 0%; }
+            6% { left: 8%; }
+            20% { left: 35%; }
+            42% { left: 62%; }
+            75% { left: 88%; }
+            100% { left: 100%; opacity: 1; }
+        }
+        @keyframes perfTravelCache {
+            0% { left: 0%; opacity: 0; }
+            8% { opacity: 1; left: 8%; }
+            35% { left: 35%; }
+            70% { left: 88%; }
+            100% { left: 100%; opacity: 1; }
+        }
+        @keyframes perfTokenStream {
+            0% { transform: translateY(4px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes perfQueuePulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(248, 113, 113, 0); }
+            50% { box-shadow: 0 0 12px 2px rgba(248, 113, 113, 0.35); }
+        }
+        .perf-travel-dot {
+            animation: perfTravelFull var(--travel-ms, 3s) ease-in-out forwards;
+        }
+        .perf-travel-dot.is-idle {
+            animation: none;
+            left: 0%;
+            opacity: 0.35;
+        }
+        .perf-travel-dot.is-done {
+            animation: none;
+            left: 100%;
+            opacity: 1;
+        }
+        .perf-token {
+            animation: perfTokenStream 0.35s ease-out forwards;
+        }
+        .perf-queue-hot {
+            animation: perfQueuePulse 1.2s ease-in-out infinite;
+        }
+        @keyframes perfReqPop {
+            0% { transform: scale(0.6); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .perf-req-dot {
+            animation: perfReqPop 0.25s ease-out forwards;
+        }
+        @keyframes perfBatchDone {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .perf-batch-complete {
+            animation: perfBatchDone 1s ease-in-out 2;
+        }
+        @keyframes archFlowDash {
+            to { stroke-dashoffset: -24; }
+        }
+        #arch-flow-svg {
+            transition: opacity 0.3s ease;
+        }
+        #arch-flow-svg.flow-hidden {
+            opacity: 0;
+        }
+        .arch-flow-path {
+            fill: none;
+            stroke: #475569;
+            stroke-width: 2;
+            stroke-dasharray: 8 6;
+            opacity: 0.4;
+            transition: stroke 0.25s ease, opacity 0.25s ease, stroke-width 0.25s ease;
+        }
+        .arch-flow-path.visited {
+            stroke: #22c55e;
+            opacity: 0.55;
+        }
+        .arch-flow-path.active {
+            stroke: #34d399;
+            stroke-width: 2.5;
+            opacity: 1;
+            animation: archFlowDash 0.55s linear infinite;
+        }
+        .arch-node {
+            min-height: 72px;
+        }
+        .arch-node .node-icon-wrapper svg {
+            width: 1.25rem;
+            height: 1.25rem;
+        }
+        .arch-flow-label-group {
+            pointer-events: none;
+        }
+        .arch-flow-label-group rect {
+            fill: #0f172a;
+            fill-opacity: 0.92;
+            stroke: #334155;
+            stroke-width: 1;
+        }
+        .arch-flow-label-group.active rect {
+            stroke: #34d399;
+            fill-opacity: 0.98;
+        }
+        .arch-flow-label {
+            font-size: 10px;
+            fill: #94a3b8;
+            font-family: Inter, sans-serif;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            pointer-events: none;
+        }
+        .arch-flow-label.active {
+            fill: #6ee7b7;
+        }
+        #details-panel-content .details-panel-icon svg {
+            width: 1.25rem;
+            height: 1.25rem;
+        }
+        #details-panel,
+        #main-panel {
+            transition: width 0.3s ease, flex 0.3s ease, opacity 0.25s ease, border-color 0.3s ease;
+        }
+        #details-panel.is-collapsed {
+            width: 0 !important;
+            min-width: 0 !important;
+            flex: 0 0 0 !important;
+            opacity: 0;
+            overflow: hidden;
+            pointer-events: none;
+            border: none;
+            box-shadow: none;
+        }
+        @media (max-width: 767px) {
+            #details-panel.is-collapsed {
+                height: 0 !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200 h-screen w-screen overflow-hidden flex flex-col selection:bg-blue-500/30">
+
+    <!-- App header -->
+    <header class="shrink-0 px-4 sm:px-6 py-4 border-b border-slate-800 bg-slate-950/80 backdrop-blur-sm z-30">
+        <h1 class="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
+            AI System Architecture
+        </h1>
+        <p class="text-sm text-slate-400 mt-0.5">Interactive end-to-end data flow</p>
+    </header>
+
+    <!-- Workspace: details (left) + main canvas -->
+    <div id="workspace" class="flex flex-1 flex-col md:flex-row min-h-0 overflow-hidden">
+
+    <!-- DETAILS PANEL (left) -->
+    <aside id="details-panel" class="order-2 md:order-1 w-full md:w-1/3 md:max-w-md md:flex-shrink-0 bg-slate-900 h-[38vh] md:h-auto overflow-hidden flex flex-col shadow-[10px_0_30px_rgba(0,0,0,0.35)] z-20 relative border-t md:border-t-0 md:border-r border-slate-800" aria-label="Component details">
+        <div class="shrink-0 px-4 py-3 border-b border-slate-800 flex items-center justify-between gap-2 bg-slate-950/60">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Component details</span>
+            <button type="button" id="btn-details-panel-header-toggle" class="md:hidden flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition-colors" onclick="appState.toggleDetailsPanel()" aria-expanded="true" aria-controls="details-panel">
+                <span id="label-details-panel-mobile">Hide</span>
+                <svg id="icon-details-panel-mobile" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
+            </button>
+        </div>
+        <div id="details-panel-content" class="flex-1 overflow-y-auto min-h-0">
+            <div class="flex items-center justify-center p-8 text-center text-slate-500 h-full min-h-[8rem]">
+                <p class="text-sm">Select a component on the diagram to view its technical details.</p>
+            </div>
+        </div>
+        <button type="button" id="btn-details-panel-seam" class="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-30 w-7 h-16 items-center justify-center rounded-r-lg bg-slate-800 border border-slate-600 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors shadow-lg" onclick="appState.toggleDetailsPanel()" title="Hide details panel" aria-expanded="true" aria-controls="details-panel" aria-label="Hide details panel">
+            <svg id="icon-details-panel-seam" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+        </button>
+    </aside>
+
+    <button type="button" id="btn-details-panel-reopen" class="hidden fixed left-0 top-1/2 -translate-y-1/2 z-30 w-8 h-16 flex items-center justify-center rounded-r-xl bg-slate-800 border border-slate-600 border-l-0 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors shadow-lg" onclick="appState.setDetailsPanelOpen(true)" title="Show component details" aria-label="Show component details">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+    </button>
+
+    <!-- MAIN CANVAS -->
+    <div id="main-panel" class="order-1 md:order-2 flex flex-col flex-1 min-w-0 min-h-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 to-slate-950">
+
+        <!-- View navigation (controls main canvas content) -->
+        <nav id="view-nav" class="shrink-0 flex border-b border-slate-800 bg-slate-950/50 backdrop-blur-sm" role="tablist" aria-label="Learning views">
+            <button id="btn-architecture" type="button" role="tab" class="view-tab-btn flex-1 sm:flex-none px-4 sm:px-6 py-3 text-sm font-medium transition-colors border-b-2 border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50" onclick="appState.setViewMode('architecture')" aria-selected="true">
+                Architecture Map
+            </button>
+            <button id="btn-performance" type="button" role="tab" class="view-tab-btn flex-1 sm:flex-none px-4 sm:px-6 py-3 text-sm font-medium transition-colors border-b-2 border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50" onclick="appState.setViewMode('performance')" aria-selected="false">
+                Performance
+            </button>
+            <button id="btn-scenario" type="button" role="tab" class="view-tab-btn flex-1 sm:flex-none px-4 sm:px-6 py-3 text-sm font-medium transition-colors border-b-2 border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50" onclick="appState.setViewMode('scenario')" aria-selected="false">
+                Scenario Walkthrough
+            </button>
+        </nav>
+
+        <!-- Main Content Area -->
+        <div class="flex-1 overflow-auto p-4 sm:p-8 relative flex items-start justify-center min-h-0 [scrollbar-gutter:stable]">
+            
+            <!-- View: Architecture Map -->
+            <div id="view-architecture" class="w-full max-w-5xl flex flex-col view-section">
+                
+                <!-- Simulation Controls -->
+                <div class="mb-8 p-4 rounded-lg bg-slate-900 border border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div class="flex items-center space-x-4 w-full sm:w-auto">
+                        <div id="sim-indicator" class="w-3 h-3 rounded-full bg-slate-500"></div>
+                        <span id="sim-message" class="font-mono text-xs sm:text-sm text-green-400 break-words">System Idle. Ready for request.</span>
+                    </div>
+                    
+                    <div class="flex items-center space-x-4 shrink-0">
+                        <button id="btn-simulate" onclick="appState.runSimulation()" class="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white px-5 py-2 rounded-md font-semibold text-sm transition-all shadow-[0_0_15px_rgba(37,99,235,0.3)] disabled:opacity-50 disabled:cursor-not-allowed">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            <span>Send Request</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Diagram: SVG flow arrows + nodes -->
+                <div id="arch-diagram-wrapper" class="relative w-full flex-shrink-0">
+                    <svg id="arch-flow-svg" class="flow-hidden absolute inset-0 w-full h-full pointer-events-none z-0 overflow-visible" aria-hidden="true">
+                        <defs>
+                            <marker id="arch-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+                                <path d="M0,0 L8,4 L0,8 Z" fill="#475569" />
+                            </marker>
+                            <marker id="arch-arrow-active" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+                                <path d="M0,0 L8,4 L0,8 Z" fill="#34d399" />
+                            </marker>
+                            <marker id="arch-arrow-visited" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+                                <path d="M0,0 L8,4 L0,8 Z" fill="#22c55e" />
+                            </marker>
+                        </defs>
+                        <g id="arch-flow-edges"></g>
+                        <g id="arch-flow-labels"></g>
+                    </svg>
+                <div id="architecture-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-start relative z-10">
+                    <!-- Column 1: Application Layer (Client-Side + Server-Side) -->
+                    <div class="flex flex-col space-y-3">
+                        <div class="text-center text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 border-b border-slate-800 pb-2">Application Layer</div>
+                        <div class="rounded-xl border border-dashed border-slate-700/70 p-2 space-y-5 bg-slate-900/40">
+                            <div id="node-appClient" class="arch-node relative p-2 rounded-xl cursor-pointer transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg flex flex-col items-center text-center justify-center bg-slate-800 border-2 border-slate-700" onclick="appState.selectNode('appClient')"></div>
+                            <div id="node-appServer" class="arch-node relative p-2 rounded-xl cursor-pointer transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg flex flex-col items-center text-center justify-center bg-slate-800 border-2 border-slate-700" onclick="appState.selectNode('appServer')"></div>
+                        </div>
+                    </div>
+                    <!-- Column 2: Infrastructure -->
+                    <div class="flex flex-col space-y-5">
+                        <div class="text-center text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 border-b border-slate-800 pb-2">Infra Layer</div>
+                        <div id="node-infraGateway" class="arch-node relative p-2 rounded-xl cursor-pointer transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg flex flex-col items-center text-center justify-center bg-slate-800 border-2 border-slate-700" onclick="appState.selectNode('infraGateway')"></div>
+                        <div id="node-semanticCache" class="arch-node relative p-2 rounded-xl cursor-pointer transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg flex flex-col items-center text-center justify-center bg-slate-800 border-2 border-slate-700" onclick="appState.selectNode('semanticCache')"></div>
+                        <div id="node-kubernetes" class="arch-node relative p-2 rounded-xl cursor-pointer transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg flex flex-col items-center text-center justify-center bg-slate-800 border-2 border-slate-700" onclick="appState.selectNode('kubernetes')"></div>
+                    </div>
+                    <!-- Column 3: Model/Orchestrator -->
+                    <div class="flex flex-col space-y-5">
+                        <div class="text-center text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 border-b border-slate-800 pb-2">Model Layer</div>
+                        <div id="node-orchestrator" class="arch-node relative p-2 rounded-xl cursor-pointer transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg flex flex-col items-center text-center justify-center bg-slate-800 border-2 border-slate-700" onclick="appState.selectNode('orchestrator')"></div>
+                    </div>
+                    <!-- Column 4: Data -->
+                    <div class="flex flex-col space-y-5">
+                        <div class="text-center text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 border-b border-slate-800 pb-2">Data Layer</div>
+                        <div id="node-dataLayer" class="arch-node relative p-2 rounded-xl cursor-pointer transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg flex flex-col items-center text-center justify-center bg-slate-800 border-2 border-slate-700" onclick="appState.selectNode('dataLayer')"></div>
+                    </div>
+                </div>
+                </div>
+            </div>
+
+            <!-- View: Performance Concepts -->
+            <div id="view-performance" class="hidden w-full max-w-5xl p-6 sm:p-8 bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-y-auto max-h-full view-section">
+                <h2 class="text-2xl font-bold text-emerald-400 mb-2 flex items-center">
+                    <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                    System Engineering & Performance
+                </h2>
+                <p class="text-sm text-slate-400 mb-6">Latency is how long <em>one</em> request waits. Throughput is how many requests the system finishes per second.</p>
+
+                <div class="flex flex-wrap gap-2 mb-6">
+                    <button type="button" data-perf-tab="caching" class="perf-tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white" onclick="perfViz.setTab('caching')">Caching</button>
+                    <button type="button" data-perf-tab="latency" class="perf-tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-slate-800 text-slate-400 hover:bg-slate-700" onclick="perfViz.setTab('latency')">Latency</button>
+                    <button type="button" data-perf-tab="scaling" class="perf-tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-slate-800 text-slate-400 hover:bg-slate-700" onclick="perfViz.setTab('scaling')">Scaling</button>
+                    <button type="button" data-perf-tab="throughput" class="perf-tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-slate-800 text-slate-400 hover:bg-slate-700" onclick="perfViz.setTab('throughput')">Throughput</button>
+                </div>
+
+                <!-- Latency tab -->
+                <div id="perf-panel-latency" class="perf-panel hidden space-y-3">
+                    <div class="p-4 bg-slate-800 rounded-xl border border-slate-700">
+                        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
+                            <div class="min-w-0">
+                                <h3 class="text-lg font-bold text-white">Latency — one request’s journey</h3>
+                                <p class="text-xs text-slate-400 mt-0.5">Send → gateway → orchestrator/RAG → response. <strong class="text-blue-400">TTFT</strong> vs total time.</p>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2 shrink-0">
+                                <button type="button" id="perf-latency-mode-full" class="perf-latency-mode px-3 py-1.5 rounded-md text-xs font-semibold bg-blue-600 text-white" onclick="perfViz.setLatencyMode('full')">Full RAG path</button>
+                                <button type="button" id="perf-latency-mode-cache" class="perf-latency-mode px-3 py-1.5 rounded-md text-xs font-semibold bg-slate-700 text-slate-300" onclick="perfViz.setLatencyMode('cache')">Cache hit</button>
+                                <label class="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 px-2 py-1.5 rounded-md bg-slate-900 border border-slate-700">
+                                    <input type="checkbox" id="perf-streaming-toggle" class="form-checkbox h-3 w-3 text-emerald-500 rounded border-slate-600 bg-slate-800" checked onchange="perfViz.setStreaming(this.checked)">
+                                    SSE streaming
+                                </label>
+                                <button type="button" id="perf-latency-play" class="px-3 py-1.5 rounded-md text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white" onclick="perfViz.replayLatency()">Replay</button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-2 mb-3">
+                            <div class="p-2 rounded-lg bg-slate-950 border border-slate-700 text-center">
+                                <div class="text-[10px] uppercase tracking-wider text-slate-500">TTFT</div>
+                                <div id="perf-metric-ttft" class="text-base font-mono font-bold text-amber-400">—</div>
+                            </div>
+                            <div class="p-2 rounded-lg bg-slate-950 border border-slate-700 text-center">
+                                <div class="text-[10px] uppercase tracking-wider text-slate-500">Total latency</div>
+                                <div id="perf-metric-total" class="text-base font-mono font-bold text-emerald-400">—</div>
+                            </div>
+                            <div class="p-2 rounded-lg bg-slate-950 border border-slate-700 text-center">
+                                <div class="text-[10px] uppercase tracking-wider text-slate-500">User perception</div>
+                                <div id="perf-metric-perceived" class="text-[11px] font-semibold text-slate-200 leading-tight">—</div>
+                            </div>
+                        </div>
+
+                        <!-- Timeline waterfall -->
+                        <div class="relative mb-2">
+                            <div class="flex justify-between text-[10px] text-slate-500 font-mono mb-0.5 px-0.5">
+                                <span>0 ms</span>
+                                <span id="perf-latency-axis-end">5000 ms</span>
+                            </div>
+                            <div id="perf-latency-track" class="relative h-2.5 rounded-full bg-slate-950 border border-slate-700 overflow-hidden">
+                                <div id="perf-latency-segments" class="absolute inset-0 flex"></div>
+                                <div id="perf-latency-ttft-marker" class="absolute top-0 bottom-0 w-0.5 bg-amber-400/80 z-10 hidden" style="left: 0%"></div>
+                                <div id="perf-latency-now" class="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)] z-20 opacity-0 transition-opacity" style="left: 0%"></div>
+                            </div>
+                            <div id="perf-latency-legend" class="flex flex-wrap gap-1.5 text-[10px] mt-1.5"></div>
+                        </div>
+
+                        <!-- Pipeline + traveling request -->
+                        <div class="relative rounded-lg bg-slate-950 border border-slate-700 p-3 overflow-hidden">
+                            <div class="flex justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+                                <span>Client</span>
+                                <span>Gateway</span>
+                                <span id="perf-latency-mid-label">Orchestrator</span>
+                                <span>Response</span>
+                            </div>
+                            <div class="relative h-10 border-t border-b border-slate-800">
+                                <div class="absolute inset-x-0 top-1/2 h-px bg-slate-700"></div>
+                                <div id="perf-latency-dot" class="perf-travel-dot is-idle absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)] z-10" style="left: 0%; --travel-ms: 4s;"></div>
+                                <div class="absolute left-[8%] top-1/2 -translate-y-1/2 w-px h-5 bg-slate-600"></div>
+                                <div class="absolute left-[35%] top-1/2 -translate-y-1/2 w-px h-5 bg-slate-600"></div>
+                                <div class="absolute left-[62%] top-1/2 -translate-y-1/2 w-px h-5 bg-slate-600" id="perf-latency-mid-tick"></div>
+                                <div class="absolute left-[88%] top-1/2 -translate-y-1/2 w-px h-5 bg-slate-600"></div>
+                            </div>
+                            <p id="perf-latency-status" class="mt-2 text-xs font-mono text-emerald-400/90 min-h-[1rem]">Press Replay to watch one request move through the system.</p>
+
+                            <!-- Mini Chat UI — what the user actually sees -->
+                            <div id="perf-latency-ui" class="mt-2 rounded-lg border border-violet-500/25 bg-gradient-to-b from-violet-950/20 to-slate-950 p-2">
+                                <div class="flex items-center justify-between gap-2 mb-1.5">
+                                    <span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-violet-300">
+                                        <svg class="w-3 h-3 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                        User&apos;s screen — Chat UI
+                                    </span>
+                                    <span class="text-[9px] text-slate-500 font-mono shrink-0">Application Layer</span>
+                                </div>
+                                <div class="rounded-md border border-slate-600 bg-slate-950/90 p-2 shadow-inner">
+                                    <div class="flex items-center gap-1 mb-1.5 pb-1 border-b border-slate-800">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-red-500/70"></span>
+                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500/70"></span>
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500/70"></span>
+                                        <span class="ml-1 text-[9px] text-slate-500 truncate">Support Assistant</span>
+                                    </div>
+                                    <div class="flex flex-col gap-1.5">
+                                        <div class="px-2 py-1 rounded-lg rounded-tr-sm bg-blue-600 text-[10px] text-blue-50 self-end max-w-[88%] shadow-sm">Summarize our refund policy.</div>
+                                        <div id="perf-latency-preview" class="px-2 py-1 rounded-lg rounded-tl-sm bg-slate-800 text-[10px] text-slate-500 self-start max-w-[95%] border border-dashed border-slate-600 min-h-[1.35rem]">
+                                            <span class="italic">Waiting for response…</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p class="mt-1 text-[9px] text-slate-500">This panel is the <em>frontend</em> view — not backend logs. Tokens appear here when streaming is on.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Throughput tab -->
+                <div id="perf-panel-throughput" class="perf-panel hidden space-y-5">
+                    <div class="p-5 bg-slate-800 rounded-xl border border-slate-700">
+                        <h3 class="text-xl font-bold text-white mb-1">Throughput — many requests at once</h3>
+                        <p class="text-sm text-slate-300 mb-5 max-w-2xl">Throughput is <strong class="text-emerald-400">completed requests per second</strong> (or tokens/sec at the model). It depends on <em>capacity</em> (pods/GPUs), not on how fast a single user’s answer feels.</p>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+                            <label class="block">
+                                <span class="text-xs text-slate-400 flex justify-between mb-1"><span>Total requests</span><span id="perf-total-val" class="font-mono text-white">12</span></span>
+                                <input type="range" id="perf-total-slider" min="4" max="40" value="12" class="w-full accent-sky-500" oninput="perfViz.setTotalRequests(+this.value)">
+                            </label>
+                            <label class="block">
+                                <span class="text-xs text-slate-400 flex justify-between mb-1"><span>Incoming load</span><span id="perf-load-val" class="font-mono text-white">8 req/s</span></span>
+                                <input type="range" id="perf-load-slider" min="1" max="20" value="8" class="w-full accent-emerald-500" oninput="perfViz.setLoad(+this.value)">
+                            </label>
+                            <label class="block">
+                                <span class="text-xs text-slate-400 flex justify-between mb-1"><span>GPU pods (capacity)</span><span id="perf-pods-val" class="font-mono text-white">2 pods</span></span>
+                                <input type="range" id="perf-pods-slider" min="1" max="6" value="2" class="w-full accent-blue-500" oninput="perfViz.setPods(+this.value)">
+                            </label>
+                        </div>
+
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                            <div class="p-3 rounded-lg bg-slate-950 border border-slate-700">
+                                <div class="text-[10px] uppercase text-slate-500">Throughput</div>
+                                <div id="perf-metric-rps" class="text-lg font-mono font-bold text-emerald-400">—</div>
+                            </div>
+                            <div class="p-3 rounded-lg bg-slate-950 border border-slate-700">
+                                <div class="text-[10px] uppercase text-slate-500">Queue depth</div>
+                                <div id="perf-metric-queue" class="text-lg font-mono font-bold text-amber-400">—</div>
+                            </div>
+                            <div class="p-3 rounded-lg bg-slate-950 border border-slate-700">
+                                <div class="text-[10px] uppercase text-slate-500">Avg wait (queued)</div>
+                                <div id="perf-metric-wait" class="text-lg font-mono font-bold text-blue-400">—</div>
+                            </div>
+                            <div class="p-3 rounded-lg bg-slate-950 border border-slate-700">
+                                <div class="text-[10px] uppercase text-slate-500">System state</div>
+                                <div id="perf-metric-state" class="text-sm font-semibold text-slate-200">—</div>
+                            </div>
+                        </div>
+
+                        <div id="perf-pipeline-wrap" class="rounded-xl bg-slate-950 border border-slate-700 p-4">
+                            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                                <div class="flex flex-wrap items-center gap-3">
+                                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Request pipeline</span>
+                                    <span class="hidden sm:inline text-[10px] text-slate-600">·</span>
+                                    <span class="flex flex-wrap gap-2 text-[10px] text-slate-500">
+                                        <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-sky-400"></span> arriving</span>
+                                        <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-violet-400"></span> gateway</span>
+                                        <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span> queued</span>
+                                        <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-400"></span> on GPU</span>
+                                        <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> done</span>
+                                    </span>
+                                </div>
+                                <span id="perf-batch-status" class="text-xs font-mono text-slate-400">Starting batch…</span>
+                            </div>
+
+                            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-3 items-stretch">
+                                <div class="rounded-lg border border-slate-700/80 bg-slate-900/40 p-2 flex flex-col">
+                                    <div class="text-[9px] font-bold uppercase text-slate-500 mb-1">Incoming</div>
+                                    <p class="text-[9px] text-slate-600 mb-1.5">at load rate</p>
+                                    <div id="perf-stage-incoming" class="flex flex-wrap gap-1 min-h-[2.25rem] content-start flex-1"></div>
+                                </div>
+                                <div class="rounded-lg border border-violet-500/20 bg-slate-900/40 p-2 flex flex-col">
+                                    <div class="text-[9px] font-bold uppercase text-violet-400/90 mb-1">API Gateway</div>
+                                    <p class="text-[9px] text-slate-600 mb-1.5">auth &amp; route (fast)</p>
+                                    <div id="perf-stage-gateway" class="flex flex-wrap gap-1 min-h-[2.25rem] content-start flex-1"></div>
+                                </div>
+                                <div id="perf-queue-stage" class="rounded-lg border border-slate-700/80 bg-slate-900/40 p-2 flex flex-col">
+                                    <div class="text-[9px] font-bold uppercase text-amber-500/90 mb-1">Queue</div>
+                                    <p class="text-[9px] text-slate-600 mb-1.5">waiting for a pod</p>
+                                    <div id="perf-stage-queue" class="flex flex-wrap gap-1 min-h-[2.25rem] content-start flex-1"></div>
+                                </div>
+                                <div class="rounded-lg border border-blue-500/25 bg-slate-900/40 p-2 flex flex-col sm:col-span-1">
+                                    <div class="text-[9px] font-bold uppercase text-blue-400/90 mb-1">GPU pods</div>
+                                    <p class="text-[9px] text-slate-600 mb-1.5"><span id="perf-pods-active-label">2</span> active</p>
+                                    <div id="perf-pod-row" class="space-y-1 flex-1"></div>
+                                </div>
+                                <div class="col-span-2 sm:col-span-1 rounded-lg border border-emerald-500/25 bg-slate-900/40 p-2 flex flex-col">
+                                    <div class="text-[9px] font-bold uppercase text-emerald-500/90 mb-1">Completed</div>
+                                    <p class="text-[9px] text-slate-600 mb-1.5">entire run</p>
+                                    <div id="perf-completed-bar" class="h-2.5 rounded-full bg-slate-800 overflow-hidden mb-1.5 shrink-0">
+                                        <div id="perf-completed-fill" class="h-full bg-emerald-500 transition-[width] duration-300 ease-out" style="width: 0%"></div>
+                                    </div>
+                                    <div id="perf-completed-count" class="text-sm font-mono font-bold text-emerald-400 text-center">0 / 12</div>
+                                    <div id="perf-completed-dots" class="flex flex-wrap gap-1 justify-center mt-1.5 min-h-[1.25rem]"></div>
+                                </div>
+                            </div>
+
+                            <p id="perf-throughput-insight" class="text-xs text-slate-400 leading-relaxed border-t border-slate-800 pt-3"></p>
+                        </div>
+
+                        <p class="mt-4 text-xs text-slate-500 border-t border-slate-700 pt-3">
+                            <strong class="text-slate-400">Key idea:</strong> Adding pods raises throughput ceiling but does not shrink one request’s inference time. When load &gt; capacity, the queue grows — users wait longer even though the GPUs stay busy.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Caching tab -->
+                <div id="perf-panel-caching" class="perf-panel space-y-5">
+                    <div class="p-5 bg-slate-800 rounded-xl border border-slate-700">
+                        <h3 class="text-xl font-bold text-white mb-2">The Power of Caching</h3>
+                        <p class="text-sm text-slate-300 mb-4">
+                            LLM inference is expensive and slow. A dedicated semantic cache layer (often Redis + embeddings, separate from the API Gateway) removes duplicate work — a throughput win for the fleet and a latency win for the user.
+                        </p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div class="p-4 rounded-lg bg-slate-950 border border-red-500/20">
+                                <div class="text-xs font-bold text-red-400 mb-2">Cache miss → high latency</div>
+                                <div class="h-2 rounded-full bg-slate-800 overflow-hidden flex">
+                                    <div class="h-full bg-blue-500" style="width: 8%"></div>
+                                    <div class="h-full bg-purple-500" style="width: 52%"></div>
+                                    <div class="h-full bg-amber-500" style="width: 28%"></div>
+                                    <div class="h-full bg-emerald-500" style="width: 12%"></div>
+                                </div>
+                                <p class="text-xs text-slate-400 mt-2 font-mono">~3.8 s total</p>
+                            </div>
+                            <div class="p-4 rounded-lg bg-slate-950 border border-emerald-500/30">
+                                <div class="text-xs font-bold text-emerald-400 mb-2">Cache hit → near-instant</div>
+                                <div class="h-2 rounded-full bg-slate-800 overflow-hidden flex">
+                                    <div class="h-full bg-blue-500" style="width: 15%"></div>
+                                    <div class="h-full bg-emerald-400" style="width: 85%"></div>
+                                </div>
+                                <p class="text-xs text-slate-400 mt-2 font-mono">~50 ms total</p>
+                            </div>
+                        </div>
+                        <ul class="list-disc list-inside text-sm text-slate-300 space-y-2 mb-6">
+                            <li>User A: “What is the capital of France?” — computed once, stored in Redis.</li>
+                            <li>User B: “Tell me France’s capital” — embedding similarity → cache hit.</li>
+                            <li>Bypasses orchestrator, vector DB, and GPU inference.</li>
+                        </ul>
+
+                        <div class="p-4 rounded-xl bg-slate-950 border border-emerald-500/30">
+                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                                <div>
+                                    <h4 class="text-sm font-bold text-white uppercase tracking-wider">Cache flow simulation</h4>
+                                    <p class="text-xs text-slate-400 mt-1">Watch which layers activate on a miss vs. a hit.</p>
+                                </div>
+                                <div class="flex flex-wrap gap-2 shrink-0">
+                                    <button type="button" id="perf-cache-mode-miss" class="perf-cache-mode px-3 py-1.5 rounded-md text-xs font-semibold bg-slate-700 text-slate-300" onclick="perfViz.setCacheMode('miss')">Cache miss</button>
+                                    <button type="button" id="perf-cache-mode-hit" class="perf-cache-mode px-3 py-1.5 rounded-md text-xs font-semibold bg-emerald-600 text-white" onclick="perfViz.setCacheMode('hit')">Cache hit</button>
+                                    <button type="button" id="perf-cache-run" class="px-3 py-1.5 rounded-md text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white" onclick="perfViz.runCacheSimulation()">Run simulation</button>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-2 mb-3">
+                                <div id="perf-cache-indicator" class="w-2.5 h-2.5 rounded-full bg-slate-500 shrink-0"></div>
+                                <span id="perf-cache-message" class="font-mono text-xs text-emerald-400/90">Ready. Choose miss or hit, then run.</span>
+                            </div>
+
+                            <div id="perf-cache-flow" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-4"></div>
+
+                            <div class="flex flex-wrap gap-4 text-xs">
+                                <div>
+                                    <span class="text-slate-500">Layers touched:</span>
+                                    <span id="perf-cache-layers-count" class="font-mono text-white ml-1">—</span>
+                                </div>
+                                <div>
+                                    <span class="text-slate-500">Est. latency:</span>
+                                    <span id="perf-cache-latency" class="font-mono text-emerald-400 ml-1">—</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scaling tab -->
+                <div id="perf-panel-scaling" class="perf-panel hidden space-y-5">
+                    <div class="p-5 bg-slate-800 rounded-xl border border-slate-700">
+                        <h3 class="text-xl font-bold text-white mb-2">Dynamic Scaling</h3>
+                        <p class="text-sm text-slate-300 mb-4">
+                            GPUs are costly. On a single EC2 box you might resize the instance; on Kubernetes you scale <em>replicas</em> when queue depth or GPU utilization crosses a threshold — restoring throughput without changing per-token inference speed.
+                        </p>
+                        <div class="flex flex-wrap gap-2 items-end mb-4">
+                            <div id="perf-scale-pods-visual" class="flex gap-2"></div>
+                            <span id="perf-scale-label" class="text-xs font-mono text-slate-400 ml-2">2 / 6 pods active</span>
+                        </div>
+                        <p class="text-sm text-slate-300">
+                            Use the <button type="button" class="text-emerald-400 underline" onclick="perfViz.setTab('throughput')">Throughput</button> tab: increase load above pod count and watch the queue grow, then add pods to drain it.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: Scenario Walkthrough -->
+            <div id="view-scenario" class="hidden w-full max-w-5xl h-full flex flex-col justify-start view-section">
+                <div class="flex-grow flex flex-col bg-slate-900 border border-purple-500/50 rounded-xl shadow-[0_0_30px_rgba(168,85,247,0.15)] overflow-hidden min-h-[300px]">
+                    
+                    <!-- Dashboard Header & Controls -->
+                    <div class="bg-purple-900/40 border-b border-purple-500/30 p-4 flex justify-between items-center">
+                        <div>
+                            <span id="scenario-step-indicator" class="text-purple-400 font-bold mr-3 bg-purple-950/50 px-2 py-1 rounded-md text-xs tracking-wider">STEP 1 / X</span>
+                            <span id="scenario-step-title" class="text-white font-semibold hidden sm:inline">Title</span>
+                        </div>
+                        <div class="flex space-x-2 shrink-0">
+                            <button id="btn-scenario-prev" onclick="appState.prevScenarioStep()" class="px-3 sm:px-4 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300 rounded-md text-sm transition-colors border border-slate-700">
+                                Prev
+                            </button>
+                            <button id="btn-scenario-next" onclick="appState.nextScenarioStep()" class="px-3 sm:px-4 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-md text-sm transition-colors shadow-lg shadow-purple-600/20">
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Dashboard Panels -->
+                    <div class="flex flex-col md:flex-row flex-grow p-4 gap-4 overflow-y-auto">
+                        
+                        <!-- 1. Context Panel -->
+                        <div class="w-full md:w-1/3 flex flex-col min-h-[150px]">
+                            <div class="text-[10px] text-slate-500 uppercase tracking-widest mb-2 font-bold">What is happening?</div>
+                            <div id="scenario-desc" class="text-slate-300 text-sm leading-relaxed p-4 sm:p-5 bg-slate-950 rounded-xl border border-slate-800 flex-grow shadow-inner">
+                                Description goes here.
+                            </div>
+                        </div>
+                        
+                        <!-- 2. Frontend View Panel -->
+                        <div class="w-full md:w-1/3 flex flex-col min-h-[200px]">
+                            <div class="text-[10px] text-slate-500 uppercase tracking-widest mb-2 font-bold flex items-center">
+                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                Frontend (User View)
+                            </div>
+                            <div id="scenario-frontend" class="flex-grow bg-slate-950 rounded-xl border border-slate-800 p-4 font-sans text-sm flex flex-col space-y-4 shadow-inner overflow-y-auto">
+                                <!-- Dynamic Chat Bubbles -->
+                            </div>
+                        </div>
+                        
+                        <!-- 3. Backend View Panel -->
+                        <div class="w-full md:w-1/3 flex flex-col min-h-[200px]">
+                            <div class="text-[10px] text-slate-500 uppercase tracking-widest mb-2 font-bold flex items-center">
+                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                Backend (System View)
+                            </div>
+                            <div id="scenario-backend" class="flex-grow bg-[#0d1117] rounded-xl border border-slate-800 p-4 sm:p-5 font-mono text-xs text-green-400 overflow-y-auto whitespace-pre-wrap shadow-inner">
+                                <!-- Dynamic Code Block -->
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    </div><!-- /#workspace -->
+
+    <script>
+        // Data Structures
+        const ARCHITECTURE_DATA = {
+            appClient: {
+                id: 'appClient', title: 'Client-Side', layer: 'Application',
+                icon: '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>',
+                description: 'This tier\'s primary job is static asset delivery. When a user navigates to the URL, this server (often an Nginx instance, a CDN like Cloudflare, or a Next.js/Vercel platform) hands the user the compiled JavaScript, HTML, CSS, and UI assets. Once those assets land in the user\'s browser, the browser itself runs the UI and handles local, short-term UI state (like "is this loading spinner active?").',
+                details: [
+                    { name: 'Static Asset Delivery', desc: 'Serves compiled JS bundles, HTML shells, CSS, fonts, and images — typically via Nginx, Cloudflare, S3 + CloudFront, or a platform like Vercel.' },
+                    { name: 'In-Browser UI Rendering', desc: 'React, Vue, or similar frameworks hydrate in the browser and manage the chat interface, input fields, and incremental token display.' },
+                    { name: 'Local UI State', desc: 'Handles ephemeral client-only state: loading spinners, draft text, scroll position, and optimistic UI updates before the server confirms.' },
+                    { name: 'Client-Side Validation', desc: 'Checks input size, format, and structure locally before forwarding to the back-end application server — a cheap first gate before any network round-trip.' }
+                ]
+            },
+            appServer: {
+                id: 'appServer', title: 'Server-Side', layer: 'Application',
+                icon: '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" /></svg>',
+                description: 'This server handles heavy-lifting application state, session persistence, and orchestration. In a production AI system, the UI should almost never call the API Gateway directly for core LLM tasks. Instead, the client talks to your Back-End Application Server, and that server talks to the API Gateway.',
+                details: [
+                    { name: 'State Management & Session Memory', desc: 'The browser shouldn\'t be trusted to hold the entire historical context of a multi-turn conversation. The back-end application server tracks the session ID, pairs it with a database (like Redis or Postgres), and hydrates the prompt with the user\'s past history before passing it down the line.' },
+                    { name: 'Secret Management', desc: 'If your API Gateway requires specific enterprise headers, cryptographic signatures, or internal service mesh tokens, putting that logic in the front-end exposes your secrets to the client\'s browser console. The server-side layer holds and injects these credentials safely.' },
+                    { name: 'Stream Handling', desc: 'While browsers can handle raw Server-Sent Events (SSE) or WebSockets, an application server acts as a buffer. It listens to the raw model stream via the gateway, validates the chunks (e.g., checking for completion or malicious content injection), and smoothly passes structured chunks back to the UI.' },
+                    { name: 'API Orchestration', desc: 'Coordinates calls to the API Gateway, semantic cache, and downstream services — translating a simple /api/chat request from the browser into the full authenticated, session-aware pipeline.' }
+                ]
+            },
+            infraGateway: {
+                id: 'infraGateway', title: 'API Gateway', layer: 'Infrastructure',
+                icon: '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>',
+                description: 'The traffic cop and security guard at the front gate — routes, secures, and shapes all inbound traffic. Many gateways can also host their own cache, which is why gateway and caching often overlap in practice.',
+                details: [
+                    { name: 'Authentication', desc: 'Validates API keys and JWTs before any request reaches downstream services.' },
+                    { name: 'Rate Limiting', desc: 'Prevents DDoS-style overload and runaway token spend by throttling requests per user or tenant.' },
+                    { name: 'Request Routing', desc: 'Reverse-proxies traffic to the right microservice or AI layer, with load balancing and protocol translation (e.g. REST to gRPC).' },
+                    { name: 'Optional Built-in Caching', desc: 'When caching is enabled (e.g. AWS API Gateway, Kong), the gateway intercepts the request and checks its own internal cache or a connected Redis cluster before forwarding. On a hit, it returns the cached response immediately — the request never travels deeper into your system. This is typically an exact match on URL, headers, or request body, not semantic similarity.' }
+                ]
+            },
+            semanticCache: {
+                id: 'semanticCache', title: 'Semantic Cache Layer', layer: 'Infrastructure',
+                icon: '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>',
+                description: 'The performance optimizer — a high-speed layer that serves fresh copies of prior answers so you skip the expensive kitchen.',
+                details: [
+                    { name: 'Embedding Similarity', desc: 'Unlike a gateway\'s exact URL/body match, semantic cache embeds the prompt and finds meaningfully similar questions (e.g. “reset password” ≈ “change password”).' },
+                    { name: 'Redis / Vector Store', desc: 'Backed by Redis or a vector DB (e.g. via GPTCache) to store prompt embeddings and cached LLM responses in RAM.' },
+                    { name: 'Cache Hit Bypass', desc: 'On a hit, returns the stored answer in milliseconds — no compute host, orchestrator, or GPU inference required.' }
+                ]
+            },
+            kubernetes: {
+                id: 'kubernetes', title: 'Docker · EC2 · K8s', layer: 'Infrastructure',
+                icon: '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>',
+                description: 'Where your AI workloads actually run — from a single Docker container on one server to a full Kubernetes cluster.',
+                details: [
+                    { name: 'Docker Containerization', desc: 'Packages models, APIs, and dependencies into isolated, reproducible containers. This is the common baseline whether you run one box or a hundred.' },
+                    { name: 'Single Node (EC2 / VPS)', desc: 'For smaller or early-stage systems, one VM (e.g. AWS EC2) running Docker Compose or a single container is enough — no orchestrator required. You scale by resizing the instance or running a second machine manually.' },
+                    { name: 'Kubernetes (when needed)', desc: 'At higher scale, K8s schedules containers across a cluster, routes GPU workloads, and adds pods automatically (horizontal scaling). Use it when single-node limits show up — not because every app must.' }
+                ]
+            },
+            orchestrator: {
+                id: 'orchestrator', title: 'Agentic Orchestrator', layer: 'Model',
+                icon: '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>',
+                description: 'The brain of the operation, executing complex reasoning and workflows.',
+                details: [
+                    { name: 'Agentic Loops', desc: 'Instead of one static generation, the agent operates in a Think-Act-Observe loop, evaluating if it has enough context to answer.' },
+                    { name: 'State Transitions', desc: 'Maintains the context of multi-step reasoning, passing outputs from one specialized model as inputs to another.' },
+                    { name: 'Tool Calling', desc: 'The ability for the LLM to trigger external APIs (e.g., "Search Web", "Run Python Code", "Query Database") dynamically.' },
+                    { name: 'Model Routing', desc: 'Analyzes prompt complexity and routes it to the most cost/performance efficient model (e.g., small model for grammar, huge model for reasoning).' }
+                ]
+            },
+            dataLayer: {
+                id: 'dataLayer', title: 'Data & Knowledge Layer', layer: 'Data',
+                icon: '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>',
+                description: 'The persistent memory and factual grounding for the AI.',
+                details: [
+                    { name: 'Vector Database', desc: 'Stores data as high-dimensional arrays (embeddings). Enables semantic search to retrieve contextually relevant documents for Retrieval-Augmented Generation (RAG).' },
+                    { name: 'SQL / Relational DB', desc: 'Stores highly structured data, user profiles, billing information, and access control lists.' },
+                    { name: 'NoSQL Database', desc: 'Handles massive volumes of unstructured conversational logs and thread history with incredibly low retrieval latency.' }
+                ]
+            },
+        };
+
+        const SCENARIO_STEPS = [
+            {
+                id: 'input', node: 'appClient', title: '1. User Input & Client Validation',
+                desc: 'The user types a question into the UI. The client-side application performs validation (e.g., checking length, preventing obvious malicious inputs) before POSTing to the back-end application server.',
+                frontend: [{ role: 'user', text: 'How do I reset my password?' }],
+                backend: '// Client-side checks pass\n{\n  "endpoint": "/api/chat",\n  "payload": "How do I reset my password?",\n  "timestamp": 1716398451\n}'
+            },
+            {
+                id: 'gateway', node: 'infraGateway', title: '2. API Gateway',
+                desc: 'The request hits the API Gateway first. It authenticates the caller and enforces rate limits. Some gateways also run built-in caching here (internal store or Redis): on an exact URL/body match they can return immediately without going deeper. In this walkthrough, gateway cache is off — traffic is routed to the dedicated semantic cache service.',
+                frontend: [
+                    { role: 'user', text: 'How do I reset my password?' },
+                    { role: 'system', text: '[ Connecting to server... ]' }
+                ],
+                backend: 'POST /v1/chat/completions\nAuth: Bearer ***\nRate Limit: OK\n\n[Gateway cache — optional]\nEnabled: false (exact-match cache not used)\nRouting: /internal/chat → semantic-cache-service'
+            },
+            {
+                id: 'cache', node: 'semanticCache', title: '3. Semantic Cache Check',
+                desc: 'After the gateway, the dedicated Semantic Cache layer embeds the prompt and searches Redis for a similar prior question. A gateway cache would only match identical strings; here we match meaning. We simulate a Cache Miss, so the request continues to the model stack.',
+                frontend: [
+                    { role: 'user', text: 'How do I reset my password?' },
+                    { role: 'system', text: '[ Checking semantic cache... ]' }
+                ],
+                backend: '[Semantic Cache — Redis + embeddings]\nPrompt vector: [0.041, -0.088, ...]\nSimilarity search (top-k)...\nBest match score: 0.71 (threshold 0.85)\nResult: MISS — no sufficiently similar answer'
+            },
+            {
+                id: 'embed', node: 'orchestrator', title: '4. Orchestration & Embedding',
+                desc: 'The Agentic Orchestrator receives the prompt. It realizes it needs internal company knowledge to answer correctly. It first calls an Embedding Model to convert the text into a vector (a high-dimensional array of numbers) that represents the semantic meaning of the question.',
+                frontend: [
+                    { role: 'user', text: 'How do I reset my password?' },
+                    { role: 'system', text: '[ Analyzing intent... ]' }
+                ],
+                backend: 'Model: text-embedding-ada-002\nInput: "How do I reset my password?"\n\nOutput Vector:\n[0.012, -0.054, 0.112, -0.992, 0.441, -0.003, ...]'
+            },
+            {
+                id: 'rag', node: 'dataLayer', title: '5. Vector Database Search (RAG)',
+                desc: 'The orchestrator takes the generated vector and queries the Data Layer (Vector Database). It finds the documents mathematically closest to the question, retrieving the official IT manual for password resets.',
+                frontend: [
+                    { role: 'user', text: 'How do I reset my password?' },
+                    { role: 'system', text: '[ Searching knowledge base... ]' }
+                ],
+                backend: 'Querying VectorDB...\nSimilarity Threshold: 0.85\n\nResults Found:\n1. doc_IT_pass_reset (score: 0.96)\n   Snippet: "To reset your password, go to the security portal..."\n2. doc_security_pol (score: 0.88)'
+            },
+            {
+                id: 'inference', node: 'orchestrator', title: '6. LLM Inference & Generation',
+                desc: 'The orchestrator combines the user\'s original prompt with the retrieved documents into a massive "System Prompt". The Large Language Model now runs inference, predicting the response one token at a time.',
+                frontend: [
+                    { role: 'user', text: 'How do I reset my password?' },
+                    { role: 'system', text: 'To reset your ' }
+                ],
+                backend: 'System Prompt: "Use the provided context to answer..."\nContext: "doc_IT_pass_reset"\nUser: "How do I..."\n\nGenerating tokens:\n"To", " reset", " your", " password", ","'
+            },
+            {
+                id: 'stream', node: 'appClient', title: '7. Streaming & UI Rendering',
+                desc: 'The server-side application buffers and validates the model stream, then passes structured chunks to the client via SSE. The browser renders tokens incrementally, lowering perceived latency. Telemetry hooks record the interaction back to the Data Layer.',
+                frontend: [
+                    { role: 'user', text: 'How do I reset my password?' },
+                    { role: 'system', text: 'To reset your password, go to the security portal and click "Forgot Password".' }
+                ],
+                backend: 'SSE Connection: OPEN\nChunk stream complete.\n\n[Telemetry]\nTTFT (Time To First Token): 180ms\nTotal Latency: 950ms\nTokens Generated: 16\nStatus: 200 OK'
+            }
+        ];
+
+        const FLOW_EDGES = [
+            { id: 'client-server-req', from: 'appClient', to: 'appServer', fromSide: 'bottom', toSide: 'top', curve: 0, label: '/api' },
+            { id: 'server-infra', from: 'appServer', to: 'infraGateway', fromSide: 'right', toSide: 'left', curve: 0, label: 'HTTPS' },
+            { id: 'infra-cache', from: 'infraGateway', to: 'semanticCache', fromSide: 'bottom', toSide: 'top', curve: 0 },
+            { id: 'cache-k8s', from: 'semanticCache', to: 'kubernetes', fromSide: 'bottom', toSide: 'top', curve: 0, label: 'MISS' },
+            { id: 'cache-infra-hit', from: 'semanticCache', to: 'infraGateway', fromSide: 'left', toSide: 'right', curve: 44, label: 'HIT' },
+            { id: 'k8s-orch', from: 'kubernetes', to: 'orchestrator', fromSide: 'right', toSide: 'left', curve: 0 },
+            { id: 'orch-data', from: 'orchestrator', to: 'dataLayer', fromSide: 'right', toSide: 'left', curve: 0, label: 'RAG query' },
+            { id: 'data-orch', from: 'dataLayer', to: 'orchestrator', fromSide: 'left', toSide: 'right', curve: 48, label: 'context' },
+            { id: 'orch-k8s', from: 'orchestrator', to: 'kubernetes', fromSide: 'left', toSide: 'right', curve: 56 },
+            { id: 'k8s-cache-store', from: 'kubernetes', to: 'semanticCache', fromSide: 'top', toSide: 'bottom', curve: 32, label: 'store' },
+            { id: 'cache-infra', from: 'semanticCache', to: 'infraGateway', fromSide: 'top', toSide: 'bottom', curve: 0 },
+            { id: 'infra-server', from: 'infraGateway', to: 'appServer', fromSide: 'left', toSide: 'right', curve: 52, label: 'SSE' },
+            { id: 'server-client', from: 'appServer', to: 'appClient', fromSide: 'top', toSide: 'bottom', curve: -32, label: 'stream' }
+        ];
+
+        const flowArrows = {
+            resizeObserver: null,
+
+            init() {
+                window.addEventListener('resize', () => this.scheduleRender());
+                const wrap = document.getElementById('arch-diagram-wrapper');
+                if (wrap && typeof ResizeObserver !== 'undefined') {
+                    this.resizeObserver = new ResizeObserver(() => this.scheduleRender());
+                    this.resizeObserver.observe(wrap);
+                }
+                this.scheduleRender();
+            },
+
+            scheduleRender() {
+                requestAnimationFrame(() => this.render());
+            },
+
+            edgeBetween(fromId, toId) {
+                const e = FLOW_EDGES.find(edge => edge.from === fromId && edge.to === toId);
+                return e ? e.id : null;
+            },
+
+            getAnchor(nodeId, side) {
+                const wrap = document.getElementById('arch-diagram-wrapper');
+                const el = document.getElementById(`node-${nodeId}`);
+                if (!wrap || !el) return null;
+                const w = wrap.getBoundingClientRect();
+                const r = el.getBoundingClientRect();
+                const pad = 4;
+                const points = {
+                    left: { x: r.left - w.left + pad, y: r.top - w.top + r.height / 2 },
+                    right: { x: r.right - w.left - pad, y: r.top - w.top + r.height / 2 },
+                    top: { x: r.left - w.left + r.width / 2, y: r.top - w.top + pad },
+                    bottom: { x: r.left - w.left + r.width / 2, y: r.bottom - w.top - pad }
+                };
+                return points[side] || points.right;
+            },
+
+            buildPath(x1, y1, x2, y2, curve) {
+                if (!curve) return `M ${x1} ${y1} L ${x2} ${y2}`;
+                const mx = (x1 + x2) / 2;
+                const my = (y1 + y2) / 2;
+                const dx = x2 - x1;
+                const dy = y2 - y1;
+                const len = Math.hypot(dx, dy) || 1;
+                const cx = mx + (-dy / len) * curve;
+                const cy = my + (dx / len) * curve;
+                return `M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`;
+            },
+
+            labelPoint(x1, y1, x2, y2, curve, edgeId) {
+                let mx = (x1 + x2) / 2;
+                let my = (y1 + y2) / 2;
+                if (curve) {
+                    const dx = x2 - x1;
+                    const dy = y2 - y1;
+                    const len = Math.hypot(dx, dy) || 1;
+                    mx += (-dy / len) * curve * 0.5;
+                    my += (dx / len) * curve * 0.5;
+                }
+                const dx = x2 - x1;
+                const dy = y2 - y1;
+                const len = Math.hypot(dx, dy) || 1;
+                const nx = -dy / len;
+                const ny = dx / len;
+                let offset = curve ? 14 : 10;
+                let side = ny <= 0 ? 1 : -1;
+                if (edgeId === 'client-server-req') {
+                    side = -1;
+                    offset = 12;
+                } else if (edgeId === 'server-client') {
+                    side = 1;
+                    offset = 12;
+                }
+                return {
+                    x: mx + nx * offset * side,
+                    y: my + ny * offset * side
+                };
+            },
+
+            appendLabel(parent, x, y, label, isActive) {
+                const charW = 5.5;
+                const padX = 5;
+                const padY = 3;
+                const w = label.length * charW + padX * 2;
+                const h = 14 + padY * 2;
+
+                const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                g.setAttribute('class', `arch-flow-label-group${isActive ? ' active' : ''}`);
+
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('x', String(x - w / 2));
+                rect.setAttribute('y', String(y - h / 2));
+                rect.setAttribute('width', String(w));
+                rect.setAttribute('height', String(h));
+                rect.setAttribute('rx', String(h / 2));
+
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', String(x));
+                text.setAttribute('y', String(y));
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('dominant-baseline', 'middle');
+                text.setAttribute('class', `arch-flow-label${isActive ? ' active' : ''}`);
+                text.textContent = label;
+
+                g.appendChild(rect);
+                g.appendChild(text);
+                parent.appendChild(g);
+            },
+
+            render() {
+                const svg = document.getElementById('arch-flow-svg');
+                const edgesG = document.getElementById('arch-flow-edges');
+                const labelsG = document.getElementById('arch-flow-labels');
+                const wrap = document.getElementById('arch-diagram-wrapper');
+                if (!svg || !edgesG || !labelsG || !wrap) return;
+
+                const showFlow = appState.isSimulating;
+                svg.classList.toggle('flow-hidden', !showFlow);
+
+                const w = wrap.getBoundingClientRect();
+                svg.setAttribute('viewBox', `0 0 ${w.width} ${w.height}`);
+                svg.setAttribute('width', w.width);
+                svg.setAttribute('height', w.height);
+
+                edgesG.innerHTML = '';
+                labelsG.innerHTML = '';
+                if (!showFlow) return;
+
+                const activeId = appState.activeFlowEdgeId;
+                const visited = appState.visitedFlowEdgeIds || [];
+
+                FLOW_EDGES.forEach(edge => {
+                    const isActive = activeId === edge.id;
+                    const isVisited = visited.includes(edge.id);
+                    if (!isActive && !isVisited) return;
+
+                    const p1 = this.getAnchor(edge.from, edge.fromSide);
+                    const p2 = this.getAnchor(edge.to, edge.toSide);
+                    if (!p1 || !p2) return;
+
+                    const d = this.buildPath(p1.x, p1.y, p2.x, p2.y, edge.curve);
+                    let cls = 'arch-flow-path';
+                    if (isActive) cls += ' active';
+                    else if (isVisited) cls += ' visited';
+
+                    let marker = 'url(#arch-arrow)';
+                    if (isActive) marker = 'url(#arch-arrow-active)';
+                    else if (isVisited) marker = 'url(#arch-arrow-visited)';
+
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    path.setAttribute('d', d);
+                    path.setAttribute('class', cls);
+                    path.setAttribute('data-edge', edge.id);
+                    path.setAttribute('marker-end', marker);
+                    edgesG.appendChild(path);
+
+                    if (edge.label) {
+                        const lp = this.labelPoint(p1.x, p1.y, p2.x, p2.y, edge.curve, edge.id);
+                        this.appendLabel(labelsG, lp.x, lp.y, edge.label, isActive);
+                    }
+                });
+            }
+        };
+
+        const appState = {
+            selectedNodeId: 'appClient',
+            activeNodeIds: [],
+            isSimulating: false,
+            viewMode: 'architecture', // 'architecture' | 'performance' | 'scenario'
+            simMessage: 'System Idle. Ready for request.',
+            currentStep: 0,
+            simulationTimeouts: [],
+            activeFlowEdgeId: null,
+            visitedFlowEdgeIds: [],
+            lastSimNode: null,
+            detailsPanelOpen: true,
+
+            init() {
+                try {
+                    const stored = localStorage.getItem('sd-details-panel-open') ?? localStorage.getItem('sd-right-panel-open');
+                    if (stored === '0') this.detailsPanelOpen = false;
+                } catch (_) { /* ignore */ }
+                this.renderInitialNodes();
+                flowArrows.init();
+                this.applyDetailsPanelLayout();
+                this.updateUI();
+            },
+
+            setDetailsPanelOpen(open) {
+                this.detailsPanelOpen = open;
+                try {
+                    localStorage.setItem('sd-details-panel-open', open ? '1' : '0');
+                } catch (_) { /* ignore */ }
+                this.applyDetailsPanelLayout();
+            },
+
+            toggleDetailsPanel() {
+                this.setDetailsPanelOpen(!this.detailsPanelOpen);
+            },
+
+            applyDetailsPanelLayout() {
+                const panel = document.getElementById('details-panel');
+                const reopen = document.getElementById('btn-details-panel-reopen');
+                const seam = document.getElementById('btn-details-panel-seam');
+                const mobileToggle = document.getElementById('btn-details-panel-header-toggle');
+                const mobileLabel = document.getElementById('label-details-panel-mobile');
+                const mobileIcon = document.getElementById('icon-details-panel-mobile');
+                const seamIcon = document.getElementById('icon-details-panel-seam');
+                const open = this.detailsPanelOpen;
+
+                if (panel) {
+                    panel.classList.toggle('is-collapsed', !open);
+                    panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+                }
+                if (reopen) reopen.classList.toggle('hidden', open);
+                if (seam) {
+                    seam.classList.toggle('hidden', !open);
+                    seam.setAttribute('aria-expanded', open ? 'true' : 'false');
+                    seam.title = open ? 'Hide component details' : 'Show component details';
+                }
+                if (mobileToggle) mobileToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                if (mobileLabel) mobileLabel.textContent = open ? 'Hide' : 'Show';
+                if (mobileIcon) {
+                    mobileIcon.innerHTML = open
+                        ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />'
+                        : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />';
+                }
+                if (seamIcon) {
+                    seamIcon.innerHTML = open
+                        ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />'
+                        : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />';
+                }
+                if (this.viewMode === 'architecture') {
+                    requestAnimationFrame(() => flowArrows.scheduleRender());
+                }
+            },
+
+            setViewMode(mode) {
+                if (this.viewMode === 'performance' && mode !== 'performance') {
+                    perfViz.stopThroughputSim();
+                    perfViz.clearLatencyAnim();
+                    perfViz.clearCacheSimulation();
+                }
+                this.viewMode = mode;
+                if (mode === 'scenario') {
+                    this.currentStep = 0;
+                    this.activeNodeIds = [SCENARIO_STEPS[0].node];
+                    this.selectedNodeId = SCENARIO_STEPS[0].node;
+                }
+                this.clearSimulation();
+                this.updateUI();
+            },
+
+            selectNode(nodeId) {
+                this.selectedNodeId = nodeId;
+                this.updateUI();
+            },
+
+            nextScenarioStep() {
+                if (this.currentStep < SCENARIO_STEPS.length - 1) {
+                    this.currentStep++;
+                    this.activeNodeIds = [SCENARIO_STEPS[this.currentStep].node];
+                    this.selectedNodeId = SCENARIO_STEPS[this.currentStep].node;
+                    this.updateUI();
+                }
+            },
+
+            prevScenarioStep() {
+                if (this.currentStep > 0) {
+                    this.currentStep--;
+                    this.activeNodeIds = [SCENARIO_STEPS[this.currentStep].node];
+                    this.selectedNodeId = SCENARIO_STEPS[this.currentStep].node;
+                    this.updateUI();
+                }
+            },
+
+            clearSimulation() {
+                this.simulationTimeouts.forEach(clearTimeout);
+                this.simulationTimeouts = [];
+                this.isSimulating = false;
+                this.simMessage = 'System Idle. Ready for request.';
+                this.activeNodeIds = [];
+                this.activeFlowEdgeId = null;
+                this.visitedFlowEdgeIds = [];
+                this.lastSimNode = null;
+            },
+
+            runSimulation() {
+                if (this.isSimulating) return;
+                this.clearSimulation();
+                this.isSimulating = true;
+                
+                const sequence = [
+                    { node: 'appClient', msg: 'User sends prompt. Client-side validation...', delay: 400 },
+                    { node: 'appServer', msg: 'Back-end hydrates session from Redis, attaches auth headers...', delay: 700 },
+                    { node: 'infraGateway', msg: 'API Gateway: auth, rate limit, routing...', delay: 1400 },
+                    { node: 'semanticCache', msg: 'Semantic cache: embedding similarity → MISS', delay: 2100 },
+                    { node: 'kubernetes', msg: 'Compute host runs agent container (Docker on EC2 or K8s pod)...', delay: 2900 },
+                    { node: 'orchestrator', msg: 'Agent orchestrator plans task. Needs context.', delay: 3800 },
+                    { node: 'dataLayer', msg: 'Querying Vector & SQL databases for context (RAG)...', delay: 4700 },
+                    { node: 'orchestrator', msg: 'Context retrieved. Running LLM inference...', delay: 5600 },
+                    { node: 'kubernetes', msg: 'Under load: scale K8s replicas or resize single EC2 instance...', delay: 6500 },
+                    { node: 'semanticCache', msg: 'Storing answer in semantic cache for similar prompts...', delay: 7200 },
+                    { node: 'infraGateway', msg: 'Validating output guardrails...', delay: 7900 },
+                    { node: 'appServer', msg: 'Buffering model stream. Validating chunks before forwarding...', delay: 8500 },
+                    { node: 'appClient', msg: 'Streaming structured chunks to UI.', delay: 8700 }
+                ];
+
+                sequence.forEach((step) => {
+                    const t = setTimeout(() => {
+                        if (this.lastSimNode) {
+                            const edgeId = flowArrows.edgeBetween(this.lastSimNode, step.node);
+                            if (edgeId && !this.visitedFlowEdgeIds.includes(edgeId)) {
+                                this.visitedFlowEdgeIds.push(edgeId);
+                            }
+                            this.activeFlowEdgeId = edgeId;
+                        }
+                        this.lastSimNode = step.node;
+                        this.activeNodeIds = [...this.activeNodeIds, step.node];
+                        this.simMessage = step.msg;
+                        this.selectedNodeId = step.node;
+                        this.updateUI();
+                    }, step.delay);
+                    this.simulationTimeouts.push(t);
+                });
+
+                const finalDelay = sequence[sequence.length - 1].delay + 1500;
+                const finalT = setTimeout(() => {
+                    this.simMessage = 'Simulation complete: Full RAG generation.';
+                    this.isSimulating = false;
+                    this.activeFlowEdgeId = null;
+                    this.visitedFlowEdgeIds = [];
+                    this.updateUI();
+
+                    const cleanupT = setTimeout(() => {
+                        this.activeNodeIds = [];
+                        this.updateUI();
+                    }, 3000);
+                    this.simulationTimeouts.push(cleanupT);
+
+                }, finalDelay);
+                this.simulationTimeouts.push(finalT);
+                this.updateUI();
+            },
+
+            renderInitialNodes() {
+                Object.keys(ARCHITECTURE_DATA).forEach(key => {
+                    const data = ARCHITECTURE_DATA[key];
+                    const nodeEl = document.getElementById(`node-${key}`);
+                    if (nodeEl) {
+                        nodeEl.innerHTML = `
+                            <div class="node-icon-wrapper p-1.5 rounded-full mb-1 bg-slate-700 text-slate-300 transition-colors duration-300">
+                                ${data.icon}
+                            </div>
+                            <h3 class="font-semibold text-xs leading-tight tracking-wide text-slate-100">${data.title}</h3>
+                        `;
+                    }
+                });
+            },
+
+            updateUI() {
+                this.updateNavButtons();
+                this.updateViewsVisibility();
+                this.updateArchitectureNodes();
+                this.updateRightPanel();
+                
+                if (this.viewMode === 'architecture') {
+                    this.updateSimulationControls();
+                    flowArrows.scheduleRender();
+                } else if (this.viewMode === 'scenario') {
+                    this.updateScenarioDashboard();
+                } else if (this.viewMode === 'performance') {
+                    perfViz.onViewShown();
+                }
+            },
+
+            updateNavButtons() {
+                const tabs = {
+                    architecture: { el: document.getElementById('btn-architecture'), color: 'border-blue-500 text-blue-400' },
+                    performance: { el: document.getElementById('btn-performance'), color: 'border-emerald-500 text-emerald-400' },
+                    scenario: { el: document.getElementById('btn-scenario'), color: 'border-purple-500 text-purple-400' }
+                };
+                const base = 'view-tab-btn flex-1 sm:flex-none px-4 sm:px-6 py-3 text-sm font-medium transition-colors border-b-2';
+
+                Object.keys(tabs).forEach(key => {
+                    const tab = tabs[key];
+                    if (!tab.el) return;
+                    const active = this.viewMode === key;
+                    tab.el.className = active
+                        ? `${base} ${tab.color} bg-slate-900/80`
+                        : `${base} border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50`;
+                    tab.el.setAttribute('aria-selected', active ? 'true' : 'false');
+                });
+            },
+
+            updateViewsVisibility() {
+                document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+                document.getElementById(`view-${this.viewMode}`).classList.remove('hidden');
+                if (this.viewMode === 'architecture') {
+                    flowArrows.scheduleRender();
+                }
+            },
+
+            updateArchitectureNodes() {
+                Object.keys(ARCHITECTURE_DATA).forEach(key => {
+                    const nodeEl = document.getElementById(`node-${key}`);
+                    if (!nodeEl) return;
+                    
+                    const isSelected = this.selectedNodeId === key;
+                    const isActive = this.activeNodeIds.includes(key);
+
+                    // Reset classes
+                    nodeEl.className = 'arch-node relative p-2 rounded-xl cursor-pointer transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg flex flex-col items-center text-center justify-center';
+                    
+                    if (isSelected) {
+                        nodeEl.classList.add('bg-blue-900', 'border-2', 'border-blue-400');
+                    } else {
+                        nodeEl.classList.add('bg-slate-800', 'border-2', 'border-slate-700', 'hover:border-slate-500');
+                    }
+
+                    if (isActive) {
+                        nodeEl.classList.add('ring-2', 'ring-green-500', 'animate-pulse', 'shadow-[0_0_12px_rgba(34,197,94,0.5)]');
+                    }
+
+                    // Update Icon Colors
+                    const iconWrapper = nodeEl.querySelector('.node-icon-wrapper');
+                    if (iconWrapper) {
+                        iconWrapper.className = `node-icon-wrapper p-1.5 rounded-full mb-1 transition-colors duration-300`;
+                        if (isActive) {
+                            iconWrapper.classList.add('bg-green-500', 'text-white');
+                        } else if (isSelected) {
+                            iconWrapper.classList.add('bg-blue-500', 'text-white');
+                        } else {
+                            iconWrapper.classList.add('bg-slate-700', 'text-slate-300');
+                        }
+                    }
+                });
+                if (this.viewMode === 'architecture') {
+                    flowArrows.scheduleRender();
+                }
+            },
+
+            updateRightPanel() {
+                const container = document.getElementById('details-panel-content');
+                if (this.viewMode === 'performance') {
+                    const hints = {
+                        latency: { title: 'Latency', body: 'Measures one request end-to-end. TTFT is when streaming starts; total latency includes all generated tokens. Caching and smaller models reduce it.' },
+                        throughput: { title: 'Throughput', body: 'Measures system-wide capacity: how many requests finish per second. Scale pods to raise the ceiling; queuing happens when load exceeds capacity.' },
+                        caching: { title: 'Caching', body: 'Semantic cache hits avoid GPU work — same answer in milliseconds. Use the simulation below to compare which layers run on a miss vs. a hit.' },
+                        scaling: { title: 'Scaling', body: 'Horizontal pod autoscaling adds parallel inference workers. Fixes backlog and raises throughput; does not change single-request GPU time.' }
+                    };
+                    const h = hints[perfViz.tab] || hints.latency;
+                    container.innerHTML = `
+                        <div class="p-6 sm:p-8 h-full flex flex-col animate-fadeIn text-sm">
+                            <span class="text-xs font-bold uppercase tracking-wider text-emerald-500">Performance lens</span>
+                            <h2 class="text-xl font-bold text-white mt-2 mb-4">${h.title}</h2>
+                            <p class="text-slate-300 text-sm leading-relaxed">${h.body}</p>
+                            <div class="mt-8 p-4 rounded-xl bg-slate-800 border border-slate-700 text-xs text-slate-400">
+                                <strong class="text-slate-300 block mb-2">Remember</strong>
+                                Low latency ≠ high throughput.
+                                This means there is a massive difference between how fast a system handles a single request versus how many concurrent requests it can handle at the same time.
+                            </div>
+                        </div>`;
+                    return;
+                }
+                if (!this.selectedNodeId || !ARCHITECTURE_DATA[this.selectedNodeId]) {
+                    container.innerHTML = `
+                        <div class="flex-grow flex items-center justify-center p-8 text-center text-slate-500 h-full">
+                            <p class="text-sm">Select a component on the diagram to view its technical details.</p>
+                        </div>`;
+                    return;
+                }
+
+                const data = ARCHITECTURE_DATA[this.selectedNodeId];
+                let detailsHtml = data.details.map(detail => `
+                    <li class="flex">
+                        <div class="mr-4 mt-1">
+                            <div class="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                        </div>
+                        <div>
+                            <h4 class="text-white font-semibold text-sm mb-1">${detail.name}</h4>
+                            <p class="text-slate-400 text-sm leading-relaxed">${detail.desc}</p>
+                        </div>
+                    </li>
+                `).join('');
+
+                container.innerHTML = `
+                    <div class="p-6 sm:p-8 h-full flex flex-col animate-fadeIn text-sm">
+                        <div class="flex items-center space-x-3 mb-4">
+                            <div class="details-panel-icon p-2 bg-blue-500/20 text-blue-400 rounded-lg shrink-0">
+                                ${data.icon}
+                            </div>
+                            <div>
+                                <span class="text-xs font-bold uppercase tracking-wider text-blue-500">${data.layer} Layer</span>
+                                <h2 class="text-xl font-bold text-white leading-tight mt-1">${data.title}</h2>
+                            </div>
+                        </div>
+                        
+                        <p class="text-slate-300 text-sm leading-relaxed mb-6 pb-4 border-b border-slate-800">
+                            ${data.description}
+                        </p>
+
+                        <div class="flex-grow">
+                            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Key Features & Technologies</h3>
+                            <ul class="space-y-4">
+                                ${detailsHtml}
+                            </ul>
+                        </div>
+                    </div>
+                `;
+            },
+
+            updateSimulationControls() {
+                const indicator = document.getElementById('sim-indicator');
+                const message = document.getElementById('sim-message');
+                const btnSimulate = document.getElementById('btn-simulate');
+
+                if (this.isSimulating) {
+                    indicator.className = 'w-3 h-3 rounded-full bg-green-500 animate-ping';
+                    btnSimulate.disabled = true;
+                } else {
+                    indicator.className = 'w-3 h-3 rounded-full bg-slate-500';
+                    btnSimulate.disabled = false;
+                }
+                message.textContent = this.simMessage;
+            },
+
+            updateScenarioDashboard() {
+                const step = SCENARIO_STEPS[this.currentStep];
+                
+                document.getElementById('scenario-step-indicator').textContent = `STEP ${this.currentStep + 1} / ${SCENARIO_STEPS.length}`;
+                document.getElementById('scenario-step-title').textContent = step.title;
+                document.getElementById('scenario-desc').textContent = step.desc;
+                
+                document.getElementById('btn-scenario-prev').disabled = this.currentStep === 0;
+                document.getElementById('btn-scenario-next').disabled = this.currentStep === SCENARIO_STEPS.length - 1;
+
+                // Frontend Bubbles
+                const frontendHtml = step.frontend.map(msg => {
+                    if (msg.role === 'user') {
+                        return `<div class="p-3 rounded-2xl max-w-[90%] shadow-md bg-blue-600 text-white self-end rounded-tr-sm">${msg.text}</div>`;
+                    } else {
+                        return `<div class="p-3 rounded-2xl max-w-[90%] shadow-md bg-slate-800 text-slate-200 self-start rounded-tl-sm border border-slate-700">${msg.text}</div>`;
+                    }
+                }).join('');
+                document.getElementById('scenario-frontend').innerHTML = frontendHtml;
+
+                // Backend Text
+                document.getElementById('scenario-backend').textContent = step.backend;
+            }
+        };
+
+        const perfViz = {
+            tab: 'caching',
+            latencyMode: 'full',
+            cacheMode: 'hit',
+            streaming: true,
+            load: 8,
+            pods: 2,
+            totalRequests: 12,
+            latencyTimer: null,
+            latencyPhaseTimer: null,
+            throughputTimer: null,
+            cacheTimeouts: [],
+            cacheActiveNodes: [],
+            cacheSimRunning: false,
+            ts: null,
+            THROUGHPUT_TICK_MS: 950,
+            THROUGHPUT_GATEWAY_TICKS: 3,
+            THROUGHPUT_POD_TICKS: 4,
+            THROUGHPUT_INCOMING_PER_TICK: 1,
+
+            CACHE_FLOW_NODES: [
+                { id: 'appClient', label: 'Client-Side', layer: 'Application' },
+                { id: 'appServer', label: 'Server-Side', layer: 'Application' },
+                { id: 'infraGateway', label: 'API Gateway', layer: 'Infra' },
+                { id: 'semanticCache', label: 'Semantic Cache', layer: 'Infra' },
+                { id: 'kubernetes', label: 'Docker / EC2 / K8s', layer: 'Infra' },
+                { id: 'orchestrator', label: 'Orchestrator', layer: 'Model' },
+                { id: 'dataLayer', label: 'Data / RAG', layer: 'Data' }
+            ],
+
+            CACHE_SEQUENCES: {
+                hit: {
+                    latency: '~50 ms',
+                    layers: 4,
+                    steps: [
+                        { node: 'appClient', msg: 'User B sends: "Tell me France\'s capital"', delay: 400 },
+                        { node: 'appServer', msg: 'Back-end forwards to API Gateway with session context', delay: 650 },
+                        { node: 'infraGateway', msg: 'API Gateway: auth & rate limit OK', delay: 900 },
+                        { node: 'semanticCache', msg: 'Embedding match → HIT in Redis', delay: 1400 },
+                        { node: 'infraGateway', msg: 'Gateway returns cached JSON — GPU & RAG bypassed', delay: 1900 },
+                        { node: 'appServer', msg: 'Back-end relays cached response', delay: 2200 },
+                        { node: 'appClient', msg: 'UI renders full answer (~50 ms total)', delay: 2500 }
+                    ]
+                },
+                miss: {
+                    latency: '~3.8 s',
+                    layers: 6,
+                    steps: [
+                        { node: 'appClient', msg: 'User A sends: "What is the capital of France?"', delay: 400 },
+                        { node: 'appServer', msg: 'Back-end hydrates session, calls API Gateway', delay: 650 },
+                        { node: 'infraGateway', msg: 'API Gateway: auth, route to cache service', delay: 900 },
+                        { node: 'semanticCache', msg: 'Semantic cache check → MISS (first time question)', delay: 1400 },
+                        { node: 'kubernetes', msg: 'Compute host routes to inference container', delay: 2000 },
+                        { node: 'orchestrator', msg: 'Orchestrator plans RAG + generation', delay: 2600 },
+                        { node: 'dataLayer', msg: 'Vector DB retrieval for context', delay: 3200 },
+                        { node: 'orchestrator', msg: 'LLM inference on GPU (~3s)', delay: 3800 },
+                        { node: 'semanticCache', msg: 'Storing answer in semantic cache for next user', delay: 4400 },
+                        { node: 'appServer', msg: 'Buffering model stream from gateway', delay: 4700 },
+                        { node: 'appClient', msg: 'Streaming response to browser UI', delay: 5000 }
+                    ]
+                }
+            },
+
+            LATENCY_PROFILES: {
+                full: {
+                    totalMs: 3800,
+                    ttftMs: 720,
+                    axisMs: 4000,
+                    travelMs: 3800,
+                    travelAnimation: 'perfTravelFull',
+                    ttftAt: 0.42,
+                    midLabel: 'Orchestrator + RAG',
+                    segments: [
+                        { label: 'Network + gateway', ms: 180, color: 'bg-blue-500' },
+                        { label: 'Embed + vector search', ms: 520, color: 'bg-purple-500' },
+                        { label: 'LLM prefill', ms: 720, color: 'bg-amber-500' },
+                        { label: 'Token generation', ms: 2380, color: 'bg-emerald-500/80' }
+                    ],
+                    phases: [
+                        { at: 0, pct: 5, msg: 'Client sends prompt over HTTPS' },
+                        { at: 0.06, pct: 18, msg: 'API Gateway: auth & rate limit → semantic cache MISS' },
+                        { at: 0.2, pct: 38, msg: 'Orchestrator: embed query, RAG retrieval' },
+                        { at: 0.35, pct: 55, msg: 'GPU container: prefill context (TTFT clock starts)' },
+                        { at: 0.42, pct: 62, msg: 'First token ready — SSE stream opens (TTFT)' },
+                        { at: 0.75, pct: 88, msg: 'Streaming tokens to Application Layer' },
+                        { at: 1, pct: 100, msg: 'Response complete — telemetry logged' }
+                    ],
+                    tokens: ['Our', ' refund', ' policy', ' allows', ' returns', ' within', ' 30', ' days', ' of', ' purchase', '.']
+                },
+                cache: {
+                    totalMs: 52,
+                    ttftMs: 48,
+                    axisMs: 200,
+                    travelMs: 900,
+                    travelAnimation: 'perfTravelCache',
+                    ttftAt: 0.35,
+                    midLabel: '(skipped)',
+                    segments: [
+                        { label: 'Network + gateway', ms: 28, color: 'bg-blue-500' },
+                        { label: 'Semantic cache HIT', ms: 18, color: 'bg-emerald-400' },
+                        { label: 'Stream cached body', ms: 6, color: 'bg-emerald-500/60' }
+                    ],
+                    phases: [
+                        { at: 0, pct: 8, msg: 'Client sends prompt' },
+                        { at: 0.35, pct: 45, msg: 'Semantic cache: embedding similarity → HIT in Redis' },
+                        { at: 0.7, pct: 78, msg: 'Return cached JSON — no GPU invoked' },
+                        { at: 1, pct: 100, msg: 'UI renders full answer (~50 ms)' }
+                    ],
+                    tokens: ['Returns', ' accepted', ' within', ' 30', ' days', '.']
+                }
+            },
+
+            setTab(tab) {
+                this.tab = tab;
+                document.querySelectorAll('.perf-tab-btn').forEach(btn => {
+                    const active = btn.dataset.perfTab === tab;
+                    btn.className = active
+                        ? 'perf-tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white'
+                        : 'perf-tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-slate-800 text-slate-400 hover:bg-slate-700';
+                });
+                document.querySelectorAll('.perf-panel').forEach(el => el.classList.add('hidden'));
+                const panel = document.getElementById(`perf-panel-${tab}`);
+                if (panel) panel.classList.remove('hidden');
+                if (tab === 'throughput') this.startThroughputSim();
+                else {
+                    this.stopThroughputSim();
+                    if (tab !== 'caching') this.clearCacheSimulation();
+                }
+                if (tab === 'scaling') this.renderScalingPods();
+                if (tab === 'caching') {
+                    this.renderCacheFlow();
+                    this.updateCacheFlowUI();
+                }
+                if (appState.viewMode === 'performance') appState.updateRightPanel();
+            },
+
+            setLatencyMode(mode) {
+                this.latencyMode = mode;
+                document.querySelectorAll('.perf-latency-mode').forEach(btn => {
+                    const isFull = btn.id === 'perf-latency-mode-full';
+                    const active = (mode === 'full' && isFull) || (mode === 'cache' && !isFull);
+                    btn.className = active
+                        ? 'perf-latency-mode px-3 py-1.5 rounded-md text-xs font-semibold bg-blue-600 text-white'
+                        : 'perf-latency-mode px-3 py-1.5 rounded-md text-xs font-semibold bg-slate-700 text-slate-300';
+                });
+                this.renderLatencyStatic();
+                this.replayLatency();
+            },
+
+            setStreaming(on) {
+                this.streaming = on;
+                const p = this.getProfile();
+                const perceived = document.getElementById('perf-metric-perceived');
+                if (perceived) {
+                    perceived.textContent = on
+                        ? `~${p.ttftMs} ms until text appears`
+                        : `~${p.totalMs} ms until anything appears`;
+                }
+                if (!this.latencyTimer && !(this.latencyPhaseTimer && this.latencyPhaseTimer.length)) {
+                    this.resetLatencyPreview();
+                }
+            },
+
+            resetLatencyDot() {
+                const dot = document.getElementById('perf-latency-dot');
+                if (!dot) return;
+                dot.style.animation = 'none';
+                dot.classList.remove('is-done');
+                dot.classList.add('is-idle');
+                dot.style.left = '0%';
+            },
+
+            finishLatencyDot() {
+                const dot = document.getElementById('perf-latency-dot');
+                if (!dot) return;
+                dot.style.animation = 'none';
+                dot.classList.remove('is-idle');
+                dot.classList.add('is-done');
+                dot.style.left = '100%';
+            },
+
+            resetLatencyPreview() {
+                const preview = document.getElementById('perf-latency-preview');
+                if (!preview) return;
+                const waiting = this.streaming
+                    ? 'Waiting for first token…'
+                    : 'Blank screen until full response…';
+                preview.className = 'px-2 py-1 rounded-lg rounded-tl-sm bg-slate-800 text-[10px] text-slate-500 self-start max-w-[95%] border border-dashed border-slate-600 min-h-[1.35rem]';
+                preview.innerHTML = `<span class="italic">${waiting}</span>`;
+            },
+
+            getProfile() {
+                return this.LATENCY_PROFILES[this.latencyMode];
+            },
+
+            renderLatencyStatic() {
+                const p = this.getProfile();
+                document.getElementById('perf-latency-axis-end').textContent = `${p.axisMs} ms`;
+                document.getElementById('perf-latency-mid-label').textContent = p.midLabel;
+                const midTick = document.getElementById('perf-latency-mid-tick');
+                if (midTick) midTick.style.opacity = this.latencyMode === 'cache' ? '0.2' : '1';
+
+                const segs = document.getElementById('perf-latency-segments');
+                segs.innerHTML = p.segments.map(s => {
+                    const w = (s.ms / p.totalMs) * 100;
+                    return `<div class="${s.color} h-full" style="width:${w}%" title="${s.label}: ${s.ms}ms"></div>`;
+                }).join('');
+
+                const legend = document.getElementById('perf-latency-legend');
+                legend.innerHTML = p.segments.map(s =>
+                    `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-400"><span class="w-2 h-2 rounded-sm ${s.color.split(' ')[0]}"></span>${s.label} <span class="text-slate-500 font-mono">${s.ms}ms</span></span>`
+                ).join('');
+
+                const ttftPct = (p.ttftMs / p.axisMs) * 100;
+                const marker = document.getElementById('perf-latency-ttft-marker');
+                marker.style.left = `${ttftPct}%`;
+                marker.classList.toggle('hidden', this.latencyMode === 'cache');
+
+                document.getElementById('perf-metric-ttft').textContent = `${p.ttftMs} ms`;
+                document.getElementById('perf-metric-total').textContent = `${p.totalMs} ms`;
+                document.getElementById('perf-metric-perceived').textContent = this.streaming
+                    ? `~${p.ttftMs} ms until text appears`
+                    : `~${p.totalMs} ms until anything appears`;
+
+                const dot = document.getElementById('perf-latency-dot');
+                dot.style.setProperty('--travel-ms', `${p.travelMs}ms`);
+            },
+
+            replayLatency() {
+                this.clearLatencyAnim();
+                const p = this.getProfile();
+                const status = document.getElementById('perf-latency-status');
+                const preview = document.getElementById('perf-latency-preview');
+                const now = document.getElementById('perf-latency-now');
+                const dot = document.getElementById('perf-latency-dot');
+                now.style.opacity = '0';
+                now.style.left = '0%';
+                dot.classList.remove('is-idle', 'is-done');
+                dot.style.animation = 'none';
+                dot.style.left = '0%';
+                void dot.offsetWidth;
+                const duration = Math.min(p.travelMs, 4500);
+                const travelAnim = p.travelAnimation || 'perfTravelFull';
+                dot.style.animation = `${travelAnim} ${duration}ms ease-in-out forwards`;
+
+                this.resetLatencyPreview();
+
+                p.phases.forEach(phase => {
+                    const t = setTimeout(() => {
+                        status.textContent = phase.msg;
+                        now.style.opacity = '1';
+                        now.style.left = `${Math.min(99, (phase.pct / 100) * (p.totalMs / p.axisMs) * 100)}%`;
+                    }, phase.at * duration);
+                    this.latencyPhaseTimer.push(t);
+                });
+
+                this.scheduleLatencyTokens(preview, p, duration);
+
+                const doneT = setTimeout(() => {
+                    this.finishLatencyDot();
+                    now.style.opacity = '1';
+                    now.style.left = `${Math.min(99, (p.totalMs / p.axisMs) * 100)}%`;
+                    status.textContent = `Done — total latency ${p.totalMs} ms${this.latencyMode === 'cache' ? ' (cache hit)' : ''}. Press Replay to run again.`;
+                    this.latencyTimer = null;
+                }, duration + 80);
+                this.latencyTimer = doneT;
+            },
+
+            scheduleLatencyTokens(preview, p, duration) {
+                if (!preview || !p.tokens || !p.tokens.length) return;
+                const bubbleActive = 'px-2 py-1 rounded-lg rounded-tl-sm bg-slate-800 text-[10px] text-slate-200 self-start max-w-[95%] border border-slate-600 min-h-[1.35rem]';
+                const ttftAt = p.ttftAt ?? 0.42;
+
+                if (!this.streaming) {
+                    const fullT = setTimeout(() => {
+                        preview.className = bubbleActive + ' border-amber-700/40';
+                        preview.textContent = p.tokens.join('');
+                    }, duration * 0.98);
+                    this.latencyPhaseTimer.push(fullT);
+                    return;
+                }
+
+                const ttftT = setTimeout(() => {
+                    preview.className = bubbleActive;
+                    preview.textContent = p.tokens[0];
+                    let idx = 1;
+                    if (idx >= p.tokens.length) return;
+                    const remaining = p.tokens.length - 1;
+                    const interval = ((1 - ttftAt) * duration) / remaining;
+                    const addToken = () => {
+                        if (idx < p.tokens.length) {
+                            preview.textContent += p.tokens[idx++];
+                            if (idx < p.tokens.length) {
+                                this.latencyPhaseTimer.push(setTimeout(addToken, interval));
+                            }
+                        }
+                    };
+                    this.latencyPhaseTimer.push(setTimeout(addToken, interval));
+                }, ttftAt * duration);
+                this.latencyPhaseTimer.push(ttftT);
+            },
+
+            clearLatencyAnim() {
+                if (this.latencyTimer) clearTimeout(this.latencyTimer);
+                this.latencyTimer = null;
+                if (Array.isArray(this.latencyPhaseTimer)) {
+                    this.latencyPhaseTimer.forEach(clearTimeout);
+                }
+                this.latencyPhaseTimer = [];
+                this.resetLatencyDot();
+                const now = document.getElementById('perf-latency-now');
+                if (now) {
+                    now.style.opacity = '0';
+                    now.style.left = '0%';
+                }
+                this.resetLatencyPreview();
+            },
+
+            setTotalRequests(n) {
+                this.totalRequests = n;
+                document.getElementById('perf-total-val').textContent = String(n);
+                this.updateThroughputMetrics();
+                if (this.tab === 'throughput') this.restartThroughputRun();
+            },
+
+            setLoad(n) {
+                this.load = n;
+                document.getElementById('perf-load-val').textContent = `${n} req/s`;
+                this.updateThroughputMetrics();
+                if (this.tab === 'throughput') this.restartThroughputRun();
+            },
+
+            setPods(n) {
+                this.pods = n;
+                document.getElementById('perf-pods-val').textContent = `${n} pod${n > 1 ? 's' : ''}`;
+                this.renderPodSlots();
+                this.updateThroughputMetrics();
+                if (this.tab === 'scaling') this.renderScalingPods();
+                if (this.tab === 'throughput') this.restartThroughputRun();
+            },
+
+            getLiveQueueDepth() {
+                if (!this.ts || !this.ts.requests) return 0;
+                return this.ts.requests.filter(r => r.stage === 'queue').length;
+            },
+
+            createThroughputState() {
+                return {
+                    totalRequests: this.totalRequests,
+                    released: 0,
+                    completed: 0,
+                    phase: 'running',
+                    requests: [],
+                    podAssignment: [null, null, null, null, null, null]
+                };
+            },
+
+            renderPodSlots() {
+                const row = document.getElementById('perf-pod-row');
+                if (!row) return;
+                const activeLabel = document.getElementById('perf-pods-active-label');
+                if (activeLabel) activeLabel.textContent = String(this.pods);
+                row.innerHTML = '';
+                for (let i = 0; i < 6; i++) {
+                    const active = i < this.pods;
+                    row.innerHTML += `
+                        <div id="perf-pod-${i}" class="flex items-center gap-2 rounded px-1.5 py-1 text-[10px] transition-all duration-200 ${active ? 'bg-slate-900/80' : 'opacity-25'}">
+                            <span class="font-bold text-slate-500 w-7 shrink-0">P${i + 1}</span>
+                            <div class="perf-pod-busy flex-1 h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                                <div class="perf-pod-busy-fill h-full w-0 bg-blue-500 transition-all duration-200"></div>
+                            </div>
+                            <span class="perf-pod-job font-mono text-slate-600 w-10 text-right shrink-0">idle</span>
+                        </div>`;
+                }
+            },
+
+            restartThroughputRun() {
+                if (this.throughputTimer) {
+                    clearInterval(this.throughputTimer);
+                    this.throughputTimer = null;
+                }
+                this.ts = this.createThroughputState();
+                this.startThroughputRun();
+                if (this.tab === 'throughput') {
+                    this.throughputTimer = setInterval(() => this.throughputTick(), this.THROUGHPUT_TICK_MS);
+                }
+            },
+
+            startThroughputRun() {
+                if (!this.ts) this.ts = this.createThroughputState();
+                this.ts.totalRequests = this.totalRequests;
+                this.ts.released = 0;
+                this.ts.completed = 0;
+                this.ts.phase = 'running';
+                this.ts.podAssignment = [null, null, null, null, null, null];
+                this.ts.requests = [];
+                const wrap = document.getElementById('perf-pipeline-wrap');
+                if (wrap) {
+                    wrap.classList.remove('perf-batch-complete', 'opacity-75');
+                }
+                this.renderThroughputPipeline();
+                this.updateRunStatus();
+            },
+
+            findIdlePod() {
+                for (let i = 0; i < this.pods; i++) {
+                    if (this.ts.podAssignment[i] === null) return i;
+                }
+                return -1;
+            },
+
+            assignRequestToPod(req, podIdx) {
+                req.stage = 'pod';
+                req.pod = podIdx;
+                req.ticks = 0;
+                this.ts.podAssignment[podIdx] = req.id;
+            },
+
+            routeFromGateway(req) {
+                const podIdx = this.findIdlePod();
+                if (podIdx !== -1) {
+                    this.assignRequestToPod(req, podIdx);
+                } else {
+                    req.stage = 'queue';
+                    req.ticks = 0;
+                }
+            },
+
+            completeThroughputRequest(req) {
+                req.stage = 'done';
+                if (req.pod !== null) this.ts.podAssignment[req.pod] = null;
+                req.pod = null;
+                this.ts.completed += 1;
+            },
+
+            assignFromQueue() {
+                const queued = this.ts.requests.filter(r => r.stage === 'queue');
+                for (const req of queued) {
+                    const podIdx = this.findIdlePod();
+                    if (podIdx === -1) break;
+                    this.assignRequestToPod(req, podIdx);
+                }
+            },
+
+            finishThroughputRun() {
+                if (!this.ts || this.ts.phase === 'complete') return;
+                this.ts.phase = 'complete';
+                if (this.throughputTimer) {
+                    clearInterval(this.throughputTimer);
+                    this.throughputTimer = null;
+                }
+                const wrap = document.getElementById('perf-pipeline-wrap');
+                if (wrap) {
+                    wrap.classList.add('perf-batch-complete', 'opacity-75');
+                }
+                const status = document.getElementById('perf-batch-status');
+                if (status) {
+                    status.textContent = `Done — all ${this.ts.totalRequests} requests processed. Adjust sliders to run again.`;
+                    status.className = 'text-xs font-mono text-emerald-400';
+                }
+                this.renderThroughputPipeline();
+                this.updateThroughputMetrics();
+            },
+
+            updateRunStatus() {
+                const el = document.getElementById('perf-batch-status');
+                if (!el || !this.ts) return;
+                if (this.ts.phase === 'complete') return;
+                const inFlight = this.ts.requests.filter(r => r.stage !== 'done').length;
+                const waiting = this.ts.totalRequests - this.ts.released;
+                el.textContent = `${this.ts.completed}/${this.ts.totalRequests} done · ${inFlight} in pipeline · ${waiting} not yet arrived`;
+                el.className = 'text-xs font-mono text-slate-400';
+            },
+
+            renderReqDots(container, requests, colorClass, maxVisible) {
+                if (!container) return;
+                const list = requests.slice(0, maxVisible);
+                const extra = requests.length - list.length;
+                container.innerHTML = list.map(r =>
+                    `<span class="perf-req-dot w-2.5 h-2.5 rounded-full ${colorClass}" title="Request ${r.id}"></span>`
+                ).join('') + (extra > 0 ? `<span class="text-[10px] text-slate-500 self-center">+${extra}</span>` : '');
+                if (!list.length && !extra) {
+                    container.innerHTML = '<span class="text-[9px] text-slate-700 italic">—</span>';
+                }
+            },
+
+            renderThroughputPipeline() {
+                if (!this.ts) return;
+                const byStage = (s) => this.ts.requests.filter(r => r.stage === s);
+
+                this.renderReqDots(document.getElementById('perf-stage-incoming'), byStage('incoming'), 'bg-sky-400', 16);
+                this.renderReqDots(document.getElementById('perf-stage-gateway'), byStage('gateway'), 'bg-violet-400', 8);
+                this.renderReqDots(document.getElementById('perf-stage-queue'), byStage('queue'), 'bg-amber-400', 16);
+
+                const queueStage = document.getElementById('perf-queue-stage');
+                const qCount = byStage('queue').length;
+                if (queueStage) {
+                    queueStage.classList.toggle('perf-queue-hot', qCount > 3);
+                    queueStage.classList.toggle('border-amber-500/40', qCount > 0);
+                }
+
+                for (let i = 0; i < 6; i++) {
+                    const podEl = document.getElementById(`perf-pod-${i}`);
+                    if (!podEl) continue;
+                    const active = i < this.pods;
+                    const reqId = this.ts.podAssignment[i];
+                    const busyFill = podEl.querySelector('.perf-pod-busy-fill');
+                    const job = podEl.querySelector('.perf-pod-job');
+                    const req = reqId ? this.ts.requests.find(r => r.id === reqId) : null;
+                    if (busyFill) {
+                        const pct = req ? Math.min(100, ((req.ticks || 0) / this.THROUGHPUT_POD_TICKS) * 100) : 0;
+                        busyFill.style.width = active && req ? `${pct}%` : '0%';
+                        busyFill.className = `perf-pod-busy-fill h-full transition-all duration-200 ${active && req ? 'bg-emerald-500' : 'bg-slate-700'}`;
+                    }
+                    if (job) {
+                        if (!active) {
+                            job.textContent = 'off';
+                            job.className = 'perf-pod-job font-mono text-slate-700 w-10 text-right shrink-0';
+                        } else if (req) {
+                            job.textContent = `#${req.id}`;
+                            job.className = 'perf-pod-job font-mono text-emerald-400 w-10 text-right shrink-0';
+                        } else {
+                            job.textContent = 'idle';
+                            job.className = 'perf-pod-job font-mono text-slate-600 w-10 text-right shrink-0';
+                        }
+                    }
+                    podEl.classList.toggle('ring-1', active && !!req);
+                    podEl.classList.toggle('ring-emerald-500/50', active && !!req);
+                }
+
+                const pct = this.ts.totalRequests > 0 ? (this.ts.completed / this.ts.totalRequests) * 100 : 0;
+                const fill = document.getElementById('perf-completed-fill');
+                const count = document.getElementById('perf-completed-count');
+                const doneDots = document.getElementById('perf-completed-dots');
+                if (fill) fill.style.width = `${pct}%`;
+                if (count) count.textContent = `${this.ts.completed} / ${this.ts.totalRequests}`;
+                this.renderReqDots(doneDots, byStage('done'), 'bg-emerald-400/90', 40);
+
+                this.updateRunStatus();
+            },
+
+            renderScalingPods() {
+                const wrap = document.getElementById('perf-scale-pods-visual');
+                const label = document.getElementById('perf-scale-label');
+                if (!wrap) return;
+                wrap.innerHTML = '';
+                for (let i = 0; i < 6; i++) {
+                    const on = i < this.pods;
+                    wrap.innerHTML += `<div class="w-10 h-12 rounded-md border flex items-center justify-center text-[10px] font-mono ${on ? 'bg-blue-900/50 border-blue-500 text-blue-300' : 'bg-slate-950 border-slate-800 text-slate-600'}">P${i + 1}</div>`;
+                }
+                if (label) label.textContent = `${this.pods} / 6 pods active (synced with Throughput tab)`;
+            },
+
+            updateThroughputMetrics() {
+                const capacity = this.pods * 3;
+                const served = Math.min(this.load, capacity);
+                const steadyQueue = Math.max(0, this.load - capacity);
+                const liveQueue = this.getLiveQueueDepth();
+                const simRunning = this.ts && this.ts.phase === 'running';
+                const queue = simRunning || (this.ts && this.ts.phase === 'complete') ? liveQueue : steadyQueue;
+                const avgWait = queue > 0
+                    ? (simRunning ? `~${(queue / Math.max(1, this.pods) * 0.8).toFixed(1)} s` : `${(queue / Math.max(1, capacity) * 1.2).toFixed(1)} s`)
+                    : '< 50 ms';
+
+                document.getElementById('perf-metric-rps').textContent = `${served} req/s`;
+                document.getElementById('perf-metric-queue').textContent = queue > 0 ? `${queue} waiting` : '0';
+                document.getElementById('perf-metric-wait').textContent = avgWait;
+
+                let state = 'Healthy';
+                let stateClass = 'text-emerald-400';
+                if (this.ts && this.ts.phase === 'complete') {
+                    state = 'Idle';
+                    stateClass = 'text-slate-400';
+                } else if (queue > 0 && queue < Math.max(2, this.load * 0.5)) {
+                    state = 'Saturated';
+                    stateClass = 'text-amber-400';
+                } else if (queue >= Math.max(2, this.load * 0.5)) {
+                    state = 'Overloaded';
+                    stateClass = 'text-red-400';
+                }
+                const stateEl = document.getElementById('perf-metric-state');
+                stateEl.textContent = state;
+                stateEl.className = `text-sm font-semibold ${stateClass}`;
+
+                const insight = document.getElementById('perf-throughput-insight');
+                if (insight) {
+                    if (this.ts && this.ts.phase === 'complete') {
+                        insight.innerHTML = `All <strong class="text-white">${this.totalRequests}</strong> requests finished. Queue depth in the metric box matches the pipeline queue in real time. Change <strong class="text-white">Total requests</strong>, load, or pods to run again.`;
+                    } else if (steadyQueue === 0) {
+                        insight.innerHTML = `Each pod handles ~3 req/s. With <strong class="text-white">${this.pods}</strong> pod(s), capacity is <strong class="text-emerald-400">${capacity} req/s</strong> — above your <strong class="text-white">${this.load}</strong> req/s load. <strong class="text-white">${this.totalRequests}</strong> requests will enter the pipeline at that rate.`;
+                    } else {
+                        insight.innerHTML = `Load (<strong class="text-white">${this.load}</strong> req/s) exceeds capacity (<strong class="text-amber-400">${capacity}</strong> req/s). Watch requests stack in the <strong class="text-amber-400">Queue</strong> column — the Queue depth metric mirrors that count live.`;
+                    }
+                }
+            },
+
+            releaseIncomingRequests() {
+                const waiting = this.ts.totalRequests - this.ts.released;
+                if (waiting <= 0) return;
+                const perTick = Math.max(1, Math.round(this.load / 5));
+                const toAdd = Math.min(perTick, waiting);
+                for (let i = 0; i < toAdd; i++) {
+                    this.ts.released += 1;
+                    this.ts.requests.push({
+                        id: this.ts.released,
+                        stage: 'incoming',
+                        pod: null,
+                        ticks: 0
+                    });
+                }
+            },
+
+            advanceIncomingToGateway() {
+                const incoming = this.ts.requests.filter(r => r.stage === 'incoming');
+                incoming.slice(0, this.THROUGHPUT_INCOMING_PER_TICK).forEach(r => {
+                    r.stage = 'gateway';
+                    r.ticks = 0;
+                });
+            },
+
+            throughputTick() {
+                if (this.tab !== 'throughput' || !this.ts || this.ts.phase === 'complete') return;
+
+                this.releaseIncomingRequests();
+                this.advanceIncomingToGateway();
+
+                this.ts.requests.filter(r => r.stage === 'gateway').forEach(r => {
+                    r.ticks += 1;
+                    if (r.ticks >= this.THROUGHPUT_GATEWAY_TICKS) this.routeFromGateway(r);
+                });
+
+                this.assignFromQueue();
+
+                this.ts.requests.filter(r => r.stage === 'pod').forEach(r => {
+                    r.ticks += 1;
+                    if (r.ticks >= this.THROUGHPUT_POD_TICKS) this.completeThroughputRequest(r);
+                });
+
+                this.renderThroughputPipeline();
+                this.updateThroughputMetrics();
+
+                const allReleased = this.ts.released >= this.ts.totalRequests;
+                const inFlight = this.ts.requests.some(r => r.stage !== 'done');
+                if (allReleased && !inFlight && this.ts.completed >= this.ts.totalRequests) {
+                    this.finishThroughputRun();
+                }
+            },
+
+            startThroughputSim() {
+                this.stopThroughputSim();
+                this.renderPodSlots();
+                this.updateThroughputMetrics();
+                this.restartThroughputRun();
+            },
+
+            stopThroughputSim() {
+                if (this.throughputTimer) clearInterval(this.throughputTimer);
+                this.throughputTimer = null;
+                this.ts = null;
+            },
+
+            setCacheMode(mode) {
+                if (this.cacheSimRunning) this.clearCacheSimulation();
+                this.cacheMode = mode;
+                document.querySelectorAll('.perf-cache-mode').forEach(btn => {
+                    const isMiss = btn.id === 'perf-cache-mode-miss';
+                    const active = (mode === 'miss' && isMiss) || (mode === 'hit' && !isMiss);
+                    btn.className = active
+                        ? `perf-cache-mode px-3 py-1.5 rounded-md text-xs font-semibold ${mode === 'hit' && !isMiss ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'}`
+                        : 'perf-cache-mode px-3 py-1.5 rounded-md text-xs font-semibold bg-slate-700 text-slate-300';
+                });
+                const meta = this.CACHE_SEQUENCES[mode];
+                document.getElementById('perf-cache-latency').textContent = meta.latency;
+                document.getElementById('perf-cache-layers-count').textContent = mode === 'hit' ? '4 (Client + Server + Gateway + Cache)' : '6 (full stack)';
+                this.renderCacheFlow();
+                this.updateCacheFlowUI();
+            },
+
+            renderCacheFlow() {
+                const wrap = document.getElementById('perf-cache-flow');
+                if (!wrap) return;
+                const bypassed = this.cacheMode === 'hit' ? ['kubernetes', 'orchestrator', 'dataLayer'] : [];
+                wrap.innerHTML = this.CACHE_FLOW_NODES.map((n, i) => {
+                    const isBypass = bypassed.includes(n.id);
+                    return `
+                        <div id="perf-cache-node-${n.id}" class="perf-cache-node relative p-3 rounded-lg border text-center transition-all duration-300 ${isBypass ? 'bg-slate-950/80 border-slate-800 opacity-40' : 'bg-slate-900 border-slate-700'}" data-node="${n.id}">
+                            ${isBypass ? '<span class="absolute -top-1.5 left-1/2 -translate-x-1/2 text-[8px] font-bold uppercase tracking-wider text-slate-500 bg-slate-950 px-1 rounded">bypassed</span>' : ''}
+                            <div class="text-[9px] font-bold text-slate-500 uppercase">${n.layer}</div>
+                            <div class="text-xs font-semibold text-slate-200 mt-0.5">${n.label}</div>
+                            ${i < this.CACHE_FLOW_NODES.length - 1 ? '<div class="hidden sm:block absolute -right-2 top-1/2 text-slate-600 text-[10px]">→</div>' : ''}
+                        </div>`;
+                }).join('');
+            },
+
+            updateCacheFlowUI() {
+                const bypassed = this.cacheMode === 'hit' ? ['kubernetes', 'orchestrator', 'dataLayer'] : [];
+                this.CACHE_FLOW_NODES.forEach(n => {
+                    const el = document.getElementById(`perf-cache-node-${n.id}`);
+                    if (!el) return;
+                    const active = this.cacheActiveNodes.includes(n.id);
+                    const isBypass = bypassed.includes(n.id);
+                    el.className = `perf-cache-node relative p-3 rounded-lg border text-center transition-all duration-300 ${
+                        active ? 'bg-emerald-900/60 border-emerald-400 ring-2 ring-emerald-500/50 shadow-[0_0_12px_rgba(52,211,153,0.35)]' :
+                        isBypass ? 'bg-slate-950/80 border-slate-800 opacity-40' : 'bg-slate-900 border-slate-700'
+                    }`;
+                });
+                const indicator = document.getElementById('perf-cache-indicator');
+                const btn = document.getElementById('perf-cache-run');
+                if (indicator) {
+                    indicator.className = this.cacheSimRunning
+                        ? 'w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping shrink-0'
+                        : 'w-2.5 h-2.5 rounded-full bg-slate-500 shrink-0';
+                }
+                if (btn) btn.disabled = this.cacheSimRunning;
+            },
+
+            runCacheSimulation() {
+                if (this.cacheSimRunning) return;
+                this.clearCacheSimulation();
+                this.cacheSimRunning = true;
+                const seq = this.CACHE_SEQUENCES[this.cacheMode];
+                const msgEl = document.getElementById('perf-cache-message');
+                if (msgEl) msgEl.textContent = 'Simulation running…';
+
+                document.querySelectorAll('.perf-cache-mode').forEach(b => { b.disabled = true; });
+                this.updateCacheFlowUI();
+
+                seq.steps.forEach(step => {
+                    const t = setTimeout(() => {
+                        if (!this.cacheActiveNodes.includes(step.node)) {
+                            this.cacheActiveNodes.push(step.node);
+                        }
+                        if (msgEl) msgEl.textContent = step.msg;
+                        this.updateCacheFlowUI();
+                    }, step.delay);
+                    this.cacheTimeouts.push(t);
+                });
+
+                const lastDelay = seq.steps[seq.steps.length - 1].delay + 1200;
+                const doneT = setTimeout(() => {
+                    if (msgEl) {
+                        msgEl.textContent = this.cacheMode === 'hit'
+                            ? 'Done: cache hit — ~50 ms, no GPU or RAG.'
+                            : 'Done: cache miss — full path; answer stored for next similar prompt.';
+                    }
+                    this.cacheSimRunning = false;
+                    document.querySelectorAll('.perf-cache-mode').forEach(b => { b.disabled = false; });
+                    this.updateCacheFlowUI();
+                    const cleanupT = setTimeout(() => {
+                        this.cacheActiveNodes = [];
+                        this.updateCacheFlowUI();
+                    }, 2500);
+                    this.cacheTimeouts.push(cleanupT);
+                }, lastDelay);
+                this.cacheTimeouts.push(doneT);
+            },
+
+            clearCacheSimulation() {
+                this.cacheTimeouts.forEach(clearTimeout);
+                this.cacheTimeouts = [];
+                this.cacheActiveNodes = [];
+                this.cacheSimRunning = false;
+                document.querySelectorAll('.perf-cache-mode').forEach(b => { b.disabled = false; });
+                const msgEl = document.getElementById('perf-cache-message');
+                if (msgEl) msgEl.textContent = 'Ready. Choose miss or hit, then run.';
+                this.updateCacheFlowUI();
+            },
+
+            onViewShown() {
+                this.renderLatencyStatic();
+                if (this.tab === 'throughput') this.startThroughputSim();
+                else if (this.tab === 'scaling') this.renderScalingPods();
+                else if (this.tab === 'caching') {
+                    this.renderCacheFlow();
+                    this.setCacheMode(this.cacheMode);
+                }
+            },
+
+            init() {
+                this.renderLatencyStatic();
+                this.renderPodSlots();
+                this.renderCacheFlow();
+                this.setCacheMode('hit');
+            }
+        };
+
+        // Boot up
+        window.addEventListener('DOMContentLoaded', () => {
+            appState.init();
+            perfViz.init();
+        });
+
+    </script>
+</body>
+</html>
