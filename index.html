@@ -9,6 +9,14 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+        }
+        .touch-target {
+            touch-action: manipulation;
+        }
+        body.details-sheet-open #main-panel {
+            overflow: hidden;
         }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
@@ -169,14 +177,55 @@
             border: none;
             box-shadow: none;
         }
+        #details-panel-backdrop {
+            transition: opacity 0.25s ease;
+        }
+        #details-panel-backdrop.is-visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
         @media (max-width: 767px) {
+            #details-panel {
+                position: fixed;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                order: unset !important;
+                width: 100% !important;
+                max-width: none !important;
+                max-height: min(70dvh, calc(100dvh - 4rem));
+                height: auto;
+                z-index: 50;
+                border-radius: 1rem 1rem 0 0;
+                border-top: 1px solid #1e293b;
+                border-right: none;
+                box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.45);
+                transform: translateY(0);
+                transition: transform 0.3s ease, opacity 0.25s ease, border-color 0.3s ease;
+                padding-bottom: env(safe-area-inset-bottom);
+            }
             #details-panel.is-collapsed {
-                height: 0 !important;
+                width: 100% !important;
+                min-width: unset !important;
+                flex: unset !important;
+                height: auto !important;
+                max-height: min(70dvh, calc(100dvh - 4rem));
+                transform: translateY(100%);
+                opacity: 0;
+            }
+            #btn-details-panel-reopen {
+                display: none !important;
+            }
+        }
+        @media (min-width: 768px) {
+            #details-panel-backdrop,
+            #btn-details-panel-fab {
+                display: none !important;
             }
         }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-200 h-screen w-screen overflow-hidden flex flex-col selection:bg-blue-500/30">
+<body class="bg-slate-950 text-slate-200 min-h-dvh h-dvh w-screen overflow-hidden flex flex-col selection:bg-blue-500/30">
 
     <!-- App header -->
     <header class="shrink-0 px-4 sm:px-6 py-4 border-b border-slate-800 bg-slate-950/80 backdrop-blur-sm z-30">
@@ -189,8 +238,11 @@
     <!-- Workspace: details (left) + main canvas -->
     <div id="workspace" class="flex flex-1 flex-col md:flex-row min-h-0 overflow-hidden">
 
-    <!-- DETAILS PANEL (left) -->
-    <aside id="details-panel" class="order-2 md:order-1 w-full md:w-1/3 md:max-w-md md:flex-shrink-0 bg-slate-900 h-[38vh] md:h-auto overflow-hidden flex flex-col shadow-[10px_0_30px_rgba(0,0,0,0.35)] z-20 relative border-t md:border-t-0 md:border-r border-slate-800" aria-label="Component details">
+    <div id="details-panel-backdrop" class="hidden fixed inset-0 bg-black/50 z-40 opacity-0 pointer-events-none md:!hidden" onclick="appState.setDetailsPanelOpen(false)" aria-hidden="true"></div>
+
+    <!-- DETAILS PANEL (left sidebar / mobile bottom sheet) -->
+    <aside id="details-panel" class="order-2 md:order-1 w-full md:w-1/3 md:max-w-md md:flex-shrink-0 bg-slate-900 md:h-auto overflow-hidden flex flex-col shadow-[10px_0_30px_rgba(0,0,0,0.35)] z-20 md:relative border-t md:border-t-0 md:border-r border-slate-800" aria-label="Component details">
+        <div class="md:hidden mx-auto mt-2 mb-1 w-10 h-1 rounded-full bg-slate-600 shrink-0" aria-hidden="true"></div>
         <div class="shrink-0 px-4 py-3 border-b border-slate-800 flex items-center justify-between gap-2 bg-slate-950/60">
             <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Component details</span>
             <button type="button" id="btn-details-panel-header-toggle" class="md:hidden flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition-colors" onclick="appState.toggleDetailsPanel()" aria-expanded="true" aria-controls="details-panel">
@@ -208,8 +260,13 @@
         </button>
     </aside>
 
-    <button type="button" id="btn-details-panel-reopen" class="hidden fixed left-0 top-1/2 -translate-y-1/2 z-30 w-8 h-16 flex items-center justify-center rounded-r-xl bg-slate-800 border border-slate-600 border-l-0 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors shadow-lg" onclick="appState.setDetailsPanelOpen(true)" title="Show component details" aria-label="Show component details">
+    <button type="button" id="btn-details-panel-reopen" class="hidden fixed left-0 top-1/2 -translate-y-1/2 z-30 w-8 h-16 flex items-center justify-center rounded-r-xl bg-slate-800 border border-slate-600 border-l-0 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors shadow-lg touch-target" onclick="appState.setDetailsPanelOpen(true)" title="Show component details" aria-label="Show component details">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+    </button>
+
+    <button type="button" id="btn-details-panel-fab" class="hidden fixed right-4 z-40 flex items-center gap-2 px-4 py-3 touch-target min-h-[44px] rounded-full bg-slate-800 border border-slate-600 text-slate-200 hover:text-white hover:bg-slate-700 transition-colors shadow-lg text-sm font-medium" style="bottom: max(1rem, env(safe-area-inset-bottom));" onclick="appState.setDetailsPanelOpen(true)" aria-label="Show component details">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        Details
     </button>
 
     <!-- MAIN CANVAS -->
@@ -217,14 +274,14 @@
 
         <!-- View navigation (controls main canvas content) -->
         <nav id="view-nav" class="shrink-0 flex border-b border-slate-800 bg-slate-950/50 backdrop-blur-sm" role="tablist" aria-label="Learning views">
-            <button id="btn-architecture" type="button" role="tab" class="view-tab-btn flex-1 sm:flex-none px-4 sm:px-6 py-3 text-sm font-medium transition-colors border-b-2 border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50" onclick="appState.setViewMode('architecture')" aria-selected="true">
-                Architecture Map
+            <button id="btn-architecture" type="button" role="tab" class="view-tab-btn touch-target flex-1 sm:flex-none px-3 sm:px-6 py-3 text-sm font-medium transition-colors border-b-2 border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 active:scale-[0.98]" onclick="appState.setViewMode('architecture')" aria-selected="true">
+                <span class="sm:hidden">Map</span><span class="hidden sm:inline">Architecture Map</span>
             </button>
-            <button id="btn-performance" type="button" role="tab" class="view-tab-btn flex-1 sm:flex-none px-4 sm:px-6 py-3 text-sm font-medium transition-colors border-b-2 border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50" onclick="appState.setViewMode('performance')" aria-selected="false">
-                Performance
+            <button id="btn-performance" type="button" role="tab" class="view-tab-btn touch-target flex-1 sm:flex-none px-3 sm:px-6 py-3 text-sm font-medium transition-colors border-b-2 border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 active:scale-[0.98]" onclick="appState.setViewMode('performance')" aria-selected="false">
+                <span class="sm:hidden">Perf</span><span class="hidden sm:inline">Performance</span>
             </button>
-            <button id="btn-scenario" type="button" role="tab" class="view-tab-btn flex-1 sm:flex-none px-4 sm:px-6 py-3 text-sm font-medium transition-colors border-b-2 border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50" onclick="appState.setViewMode('scenario')" aria-selected="false">
-                Scenario Walkthrough
+            <button id="btn-scenario" type="button" role="tab" class="view-tab-btn touch-target flex-1 sm:flex-none px-3 sm:px-6 py-3 text-sm font-medium transition-colors border-b-2 border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 active:scale-[0.98]" onclick="appState.setViewMode('scenario')" aria-selected="false">
+                <span class="sm:hidden">Scenario</span><span class="hidden sm:inline">Scenario Walkthrough</span>
             </button>
         </nav>
 
@@ -242,7 +299,7 @@
                     </div>
                     
                     <div class="flex items-center space-x-4 shrink-0">
-                        <button id="btn-simulate" onclick="appState.runSimulation()" class="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white px-5 py-2 rounded-md font-semibold text-sm transition-all shadow-[0_0_15px_rgba(37,99,235,0.3)] disabled:opacity-50 disabled:cursor-not-allowed">
+                        <button id="btn-simulate" onclick="appState.runSimulation()" class="touch-target flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white px-5 py-2.5 rounded-md font-semibold text-sm transition-all shadow-[0_0_15px_rgba(37,99,235,0.3)] disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] min-h-[44px]">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                             <span>Send Request</span>
                         </button>
@@ -297,7 +354,7 @@
             </div>
 
             <!-- View: Performance Concepts -->
-            <div id="view-performance" class="hidden w-full max-w-5xl p-6 sm:p-8 bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-y-auto max-h-full view-section">
+            <div id="view-performance" class="hidden w-full max-w-5xl p-4 sm:p-8 bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-y-auto max-h-full view-section">
                 <h2 class="text-2xl font-bold text-emerald-400 mb-2 flex items-center">
                     <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                     System Engineering & Performance
@@ -305,10 +362,10 @@
                 <p class="text-sm text-slate-400 mb-6">Latency is how long <em>one</em> request waits. Throughput is how many requests the system finishes per second.</p>
 
                 <div class="flex flex-wrap gap-2 mb-6">
-                    <button type="button" data-perf-tab="caching" class="perf-tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white" onclick="perfViz.setTab('caching')">Caching</button>
-                    <button type="button" data-perf-tab="latency" class="perf-tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-slate-800 text-slate-400 hover:bg-slate-700" onclick="perfViz.setTab('latency')">Latency</button>
-                    <button type="button" data-perf-tab="scaling" class="perf-tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-slate-800 text-slate-400 hover:bg-slate-700" onclick="perfViz.setTab('scaling')">Scaling</button>
-                    <button type="button" data-perf-tab="throughput" class="perf-tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-slate-800 text-slate-400 hover:bg-slate-700" onclick="perfViz.setTab('throughput')">Throughput</button>
+                    <button type="button" data-perf-tab="caching" class="perf-tab-btn touch-target min-h-[44px] px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white active:scale-[0.98]" onclick="perfViz.setTab('caching')">Caching</button>
+                    <button type="button" data-perf-tab="latency" class="perf-tab-btn touch-target min-h-[44px] px-4 py-2 rounded-lg text-sm font-medium bg-slate-800 text-slate-400 hover:bg-slate-700 active:scale-[0.98]" onclick="perfViz.setTab('latency')">Latency</button>
+                    <button type="button" data-perf-tab="scaling" class="perf-tab-btn touch-target min-h-[44px] px-4 py-2 rounded-lg text-sm font-medium bg-slate-800 text-slate-400 hover:bg-slate-700 active:scale-[0.98]" onclick="perfViz.setTab('scaling')">Scaling</button>
+                    <button type="button" data-perf-tab="throughput" class="perf-tab-btn touch-target min-h-[44px] px-4 py-2 rounded-lg text-sm font-medium bg-slate-800 text-slate-400 hover:bg-slate-700 active:scale-[0.98]" onclick="perfViz.setTab('throughput')">Throughput</button>
                 </div>
 
                 <!-- Latency tab -->
@@ -330,17 +387,17 @@
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-3 gap-2 mb-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
                             <div class="p-2 rounded-lg bg-slate-950 border border-slate-700 text-center">
-                                <div class="text-[10px] uppercase tracking-wider text-slate-500">TTFT</div>
+                                <div class="text-xs sm:text-[10px] uppercase tracking-wider text-slate-500">TTFT</div>
                                 <div id="perf-metric-ttft" class="text-base font-mono font-bold text-amber-400">—</div>
                             </div>
                             <div class="p-2 rounded-lg bg-slate-950 border border-slate-700 text-center">
-                                <div class="text-[10px] uppercase tracking-wider text-slate-500">Total latency</div>
+                                <div class="text-xs sm:text-[10px] uppercase tracking-wider text-slate-500">Total latency</div>
                                 <div id="perf-metric-total" class="text-base font-mono font-bold text-emerald-400">—</div>
                             </div>
                             <div class="p-2 rounded-lg bg-slate-950 border border-slate-700 text-center">
-                                <div class="text-[10px] uppercase tracking-wider text-slate-500">User perception</div>
+                                <div class="text-xs sm:text-[10px] uppercase tracking-wider text-slate-500">User perception</div>
                                 <div id="perf-metric-perceived" class="text-[11px] font-semibold text-slate-200 leading-tight">—</div>
                             </div>
                         </div>
@@ -361,7 +418,7 @@
 
                         <!-- Pipeline + traveling request -->
                         <div class="relative rounded-lg bg-slate-950 border border-slate-700 p-3 overflow-hidden">
-                            <div class="flex justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+                            <div class="grid grid-cols-2 gap-x-2 gap-y-1 sm:flex sm:justify-between text-xs sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
                                 <span>Client</span>
                                 <span>Gateway</span>
                                 <span id="perf-latency-mid-label">Orchestrator</span>
@@ -462,7 +519,7 @@
                                 <span id="perf-batch-status" class="text-xs font-mono text-slate-400">Starting batch…</span>
                             </div>
 
-                            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-3 items-stretch">
+                            <div class="grid grid-cols-1 min-[480px]:grid-cols-2 sm:grid-cols-5 gap-2 mb-3 items-stretch">
                                 <div class="rounded-lg border border-slate-700/80 bg-slate-900/40 p-2 flex flex-col">
                                     <div class="text-[9px] font-bold uppercase text-slate-500 mb-1">Incoming</div>
                                     <p class="text-[9px] text-slate-600 mb-1.5">at load rate</p>
@@ -593,16 +650,16 @@
                 <div class="flex-grow flex flex-col bg-slate-900 border border-purple-500/50 rounded-xl shadow-[0_0_30px_rgba(168,85,247,0.15)] overflow-hidden min-h-[300px]">
                     
                     <!-- Dashboard Header & Controls -->
-                    <div class="bg-purple-900/40 border-b border-purple-500/30 p-4 flex justify-between items-center">
-                        <div>
+                    <div class="bg-purple-900/40 border-b border-purple-500/30 p-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                        <div class="min-w-0">
                             <span id="scenario-step-indicator" class="text-purple-400 font-bold mr-3 bg-purple-950/50 px-2 py-1 rounded-md text-xs tracking-wider">STEP 1 / X</span>
-                            <span id="scenario-step-title" class="text-white font-semibold hidden sm:inline">Title</span>
+                            <span id="scenario-step-title" class="text-white font-semibold text-sm sm:text-base block sm:inline mt-1 sm:mt-0 truncate">Title</span>
                         </div>
                         <div class="flex space-x-2 shrink-0">
-                            <button id="btn-scenario-prev" onclick="appState.prevScenarioStep()" class="px-3 sm:px-4 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300 rounded-md text-sm transition-colors border border-slate-700">
+                            <button id="btn-scenario-prev" onclick="appState.prevScenarioStep()" class="touch-target min-h-[44px] px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300 rounded-md text-sm transition-colors border border-slate-700 active:scale-[0.98]">
                                 Prev
                             </button>
-                            <button id="btn-scenario-next" onclick="appState.nextScenarioStep()" class="px-3 sm:px-4 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-md text-sm transition-colors shadow-lg shadow-purple-600/20">
+                            <button id="btn-scenario-next" onclick="appState.nextScenarioStep()" class="touch-target min-h-[44px] px-4 py-2.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-md text-sm transition-colors shadow-lg shadow-purple-600/20 active:scale-[0.98]">
                                 Next
                             </button>
                         </div>
@@ -612,7 +669,7 @@
                     <div class="flex flex-col md:flex-row flex-grow p-4 gap-4 overflow-y-auto">
                         
                         <!-- 1. Context Panel -->
-                        <div class="w-full md:w-1/3 flex flex-col min-h-[150px]">
+                        <div class="w-full md:w-1/3 flex flex-col min-h-[120px] md:min-h-[150px]">
                             <div class="text-[10px] text-slate-500 uppercase tracking-widest mb-2 font-bold">What is happening?</div>
                             <div id="scenario-desc" class="text-slate-300 text-sm leading-relaxed p-4 sm:p-5 bg-slate-950 rounded-xl border border-slate-800 flex-grow shadow-inner">
                                 Description goes here.
@@ -620,7 +677,7 @@
                         </div>
                         
                         <!-- 2. Frontend View Panel -->
-                        <div class="w-full md:w-1/3 flex flex-col min-h-[200px]">
+                        <div class="w-full md:w-1/3 flex flex-col min-h-[120px] md:min-h-[200px]">
                             <div class="text-[10px] text-slate-500 uppercase tracking-widest mb-2 font-bold flex items-center">
                                 <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                                 Frontend (User View)
@@ -631,7 +688,7 @@
                         </div>
                         
                         <!-- 3. Backend View Panel -->
-                        <div class="w-full md:w-1/3 flex flex-col min-h-[200px]">
+                        <div class="w-full md:w-1/3 flex flex-col min-h-[120px] md:min-h-[200px]">
                             <div class="text-[10px] text-slate-500 uppercase tracking-widest mb-2 font-bold flex items-center">
                                 <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                                 Backend (System View)
@@ -808,8 +865,34 @@
             { id: 'server-client', from: 'appServer', to: 'appClient', fromSide: 'top', toSide: 'bottom', curve: -32, label: 'stream' }
         ];
 
+        const FLOW_EDGE_MOBILE_SIDES = {
+            'client-server-req': { fromSide: 'bottom', toSide: 'top', curve: 0 },
+            'server-infra': { fromSide: 'bottom', toSide: 'top', curve: 0 },
+            'infra-cache': { fromSide: 'bottom', toSide: 'top', curve: 0 },
+            'cache-k8s': { fromSide: 'bottom', toSide: 'top', curve: 0 },
+            'cache-infra-hit': { fromSide: 'top', toSide: 'bottom', curve: 20 },
+            'k8s-orch': { fromSide: 'bottom', toSide: 'top', curve: 0 },
+            'orch-data': { fromSide: 'bottom', toSide: 'top', curve: 0 },
+            'data-orch': { fromSide: 'top', toSide: 'bottom', curve: 20 },
+            'orch-k8s': { fromSide: 'top', toSide: 'bottom', curve: 20 },
+            'k8s-cache-store': { fromSide: 'top', toSide: 'bottom', curve: 16 },
+            'cache-infra': { fromSide: 'top', toSide: 'bottom', curve: 0 },
+            'infra-server': { fromSide: 'top', toSide: 'bottom', curve: 24 },
+            'server-client': { fromSide: 'top', toSide: 'bottom', curve: -12 }
+        };
+
         const flowArrows = {
             resizeObserver: null,
+
+            isStackedLayout() {
+                return window.matchMedia('(max-width: 639px)').matches;
+            },
+
+            resolveEdge(edge) {
+                if (!this.isStackedLayout()) return edge;
+                const override = FLOW_EDGE_MOBILE_SIDES[edge.id];
+                return override ? { ...edge, ...override } : edge;
+            },
 
             init() {
                 window.addEventListener('resize', () => this.scheduleRender());
@@ -940,7 +1023,8 @@
                 const activeId = appState.activeFlowEdgeId;
                 const visited = appState.visitedFlowEdgeIds || [];
 
-                FLOW_EDGES.forEach(edge => {
+                FLOW_EDGES.forEach(rawEdge => {
+                    const edge = this.resolveEdge(rawEdge);
                     const isActive = activeId === edge.id;
                     const isVisited = visited.includes(edge.id);
                     if (!isActive && !isVisited) return;
@@ -949,7 +1033,8 @@
                     const p2 = this.getAnchor(edge.to, edge.toSide);
                     if (!p1 || !p2) return;
 
-                    const d = this.buildPath(p1.x, p1.y, p2.x, p2.y, edge.curve);
+                    const curve = this.isStackedLayout() ? (edge.curve || 0) * 0.75 : edge.curve;
+                    const d = this.buildPath(p1.x, p1.y, p2.x, p2.y, curve);
                     let cls = 'arch-flow-path';
                     if (isActive) cls += ' active';
                     else if (isVisited) cls += ' visited';
@@ -966,7 +1051,7 @@
                     edgesG.appendChild(path);
 
                     if (edge.label) {
-                        const lp = this.labelPoint(p1.x, p1.y, p2.x, p2.y, edge.curve, edge.id);
+                        const lp = this.labelPoint(p1.x, p1.y, p2.x, p2.y, curve, edge.id);
                         this.appendLabel(labelsG, lp.x, lp.y, edge.label, isActive);
                     }
                 });
@@ -986,14 +1071,20 @@
             lastSimNode: null,
             detailsPanelOpen: true,
 
+            isMobileViewport() {
+                return window.matchMedia('(max-width: 767px)').matches;
+            },
+
             init() {
                 try {
                     const stored = localStorage.getItem('sd-details-panel-open') ?? localStorage.getItem('sd-right-panel-open');
                     if (stored === '0') this.detailsPanelOpen = false;
+                    else if (stored === '1') this.detailsPanelOpen = true;
+                    else if (this.isMobileViewport()) this.detailsPanelOpen = false;
                 } catch (_) { /* ignore */ }
+                window.addEventListener('resize', () => this.applyDetailsPanelLayout());
                 this.renderInitialNodes();
                 flowArrows.init();
-                this.applyDetailsPanelLayout();
                 this.updateUI();
             },
 
@@ -1011,21 +1102,31 @@
 
             applyDetailsPanelLayout() {
                 const panel = document.getElementById('details-panel');
+                const backdrop = document.getElementById('details-panel-backdrop');
                 const reopen = document.getElementById('btn-details-panel-reopen');
+                const fab = document.getElementById('btn-details-panel-fab');
                 const seam = document.getElementById('btn-details-panel-seam');
                 const mobileToggle = document.getElementById('btn-details-panel-header-toggle');
                 const mobileLabel = document.getElementById('label-details-panel-mobile');
                 const mobileIcon = document.getElementById('icon-details-panel-mobile');
                 const seamIcon = document.getElementById('icon-details-panel-seam');
                 const open = this.detailsPanelOpen;
+                const mobile = this.isMobileViewport();
 
                 if (panel) {
                     panel.classList.toggle('is-collapsed', !open);
                     panel.setAttribute('aria-hidden', open ? 'false' : 'true');
                 }
-                if (reopen) reopen.classList.toggle('hidden', open);
+                if (backdrop) {
+                    const showBackdrop = mobile && open;
+                    backdrop.classList.toggle('hidden', !showBackdrop);
+                    backdrop.classList.toggle('is-visible', showBackdrop);
+                    backdrop.setAttribute('aria-hidden', showBackdrop ? 'false' : 'true');
+                }
+                if (reopen) reopen.classList.toggle('hidden', open || mobile);
+                if (fab) fab.classList.toggle('hidden', open || !mobile);
                 if (seam) {
-                    seam.classList.toggle('hidden', !open);
+                    seam.classList.toggle('hidden', !open || mobile);
                     seam.setAttribute('aria-expanded', open ? 'true' : 'false');
                     seam.title = open ? 'Hide component details' : 'Show component details';
                 }
@@ -1041,6 +1142,7 @@
                         ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />'
                         : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />';
                 }
+                document.body.classList.toggle('details-sheet-open', mobile && open);
                 if (this.viewMode === 'architecture') {
                     requestAnimationFrame(() => flowArrows.scheduleRender());
                 }
@@ -1064,6 +1166,7 @@
 
             selectNode(nodeId) {
                 this.selectedNodeId = nodeId;
+                if (this.isMobileViewport()) this.setDetailsPanelOpen(true);
                 this.updateUI();
             },
 
@@ -1174,6 +1277,7 @@
                 this.updateViewsVisibility();
                 this.updateArchitectureNodes();
                 this.updateRightPanel();
+                this.applyDetailsPanelLayout();
                 
                 if (this.viewMode === 'architecture') {
                     this.updateSimulationControls();
@@ -1191,7 +1295,7 @@
                     performance: { el: document.getElementById('btn-performance'), color: 'border-emerald-500 text-emerald-400' },
                     scenario: { el: document.getElementById('btn-scenario'), color: 'border-purple-500 text-purple-400' }
                 };
-                const base = 'view-tab-btn flex-1 sm:flex-none px-4 sm:px-6 py-3 text-sm font-medium transition-colors border-b-2';
+                const base = 'view-tab-btn touch-target flex-1 sm:flex-none px-3 sm:px-6 py-3 text-sm font-medium transition-colors border-b-2 active:scale-[0.98]';
 
                 Object.keys(tabs).forEach(key => {
                     const tab = tabs[key];
@@ -1221,7 +1325,7 @@
                     const isActive = this.activeNodeIds.includes(key);
 
                     // Reset classes
-                    nodeEl.className = 'arch-node relative p-2 rounded-xl cursor-pointer transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg flex flex-col items-center text-center justify-center';
+                    nodeEl.className = 'arch-node touch-target relative p-2 rounded-xl cursor-pointer transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg active:scale-[0.98] flex flex-col items-center text-center justify-center';
                     
                     if (isSelected) {
                         nodeEl.classList.add('bg-blue-900', 'border-2', 'border-blue-400');
